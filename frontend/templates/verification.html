@@ -1,0 +1,464 @@
+{% extends "base.html" %}
+
+{% block title %}FinCheck | Vendor Document Verification & Trust Score{% endblock %}
+
+{% block content %}
+<style>
+    .verification-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+    }
+    
+    .trust-container {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        gap: 30px;
+        margin-bottom: 40px;
+    }
+    
+    .trust-score-card {
+        text-align: center;
+        padding: 40px 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .trust-gauge {
+        width: 160px;
+        height: 160px;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 20px;
+    }
+    
+    .trust-gauge svg {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        transform: rotate(-90deg);
+    }
+    
+    .trust-gauge circle {
+        fill: none;
+        stroke-width: 12;
+    }
+    
+    .trust-gauge .bg-circle {
+        stroke: var(--glass-border);
+    }
+    
+    .trust-gauge .progress-circle {
+        stroke: var(--primary);
+        stroke-linecap: round;
+        transition: stroke-dashoffset 0.8s ease;
+    }
+    
+    .trust-number {
+        font-size: 2.8rem;
+        font-weight: 800;
+        color: var(--text-primary);
+        line-height: 1;
+    }
+    
+    .trust-level-badge {
+        font-size: 0.9rem;
+        font-weight: 700;
+        padding: 6px 14px;
+        border-radius: 20px;
+        margin-top: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .trust-metric-row {
+        display: flex;
+        justify-content: space-between;
+        width: 100%;
+        max-width: 250px;
+        font-size: 0.85rem;
+        margin-top: 10px;
+        color: var(--text-secondary);
+    }
+    
+    .upload-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 20px;
+    }
+    
+    .upload-card {
+        padding: 24px;
+        border: 2px dashed var(--glass-border);
+        border-radius: 12px;
+        text-align: center;
+        transition: all 0.3s ease;
+        position: relative;
+        background-color: var(--glass-bg);
+    }
+    
+    .upload-card.dragover {
+        border-color: var(--primary);
+        background-color: rgba(37, 99, 235, 0.05);
+    }
+    
+    .upload-card.verified {
+        border-style: solid;
+        border-color: var(--success);
+    }
+    
+    .upload-card.rejected {
+        border-style: solid;
+        border-color: var(--danger);
+    }
+    
+    .upload-icon {
+        font-size: 2rem;
+        color: var(--text-secondary);
+        margin-bottom: 12px;
+    }
+    
+    .upload-card.verified .upload-icon {
+        color: var(--success);
+    }
+    
+    .upload-card.rejected .upload-icon {
+        color: var(--danger);
+    }
+    
+    .upload-btn-wrapper {
+        position: relative;
+        overflow: hidden;
+        display: inline-block;
+        margin-top: 12px;
+    }
+    
+    .upload-btn-wrapper input[type=file] {
+        font-size: 100px;
+        position: absolute;
+        left: 0;
+        top: 0;
+        opacity: 0;
+        cursor: pointer;
+    }
+    
+    .feedback-note {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-top: 8px;
+        font-style: italic;
+    }
+</style>
+
+<div class="verification-header">
+    <div>
+        <h2 style="font-weight: 700; color: var(--text-primary);">Document Verification Center</h2>
+        <p style="color: var(--text-secondary);">Verify your business credentials to check and increase your Trust Score rating.</p>
+    </div>
+    <a href="/applicant/dashboard" class="btn btn-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Dashboard
+    </a>
+</div>
+
+<div class="trust-container">
+    <!-- Trust Score Gauge -->
+    <div class="glass-panel trust-score-card">
+        <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 25px; text-transform: uppercase; letter-spacing: 1px;">Vendor Trust Rating</h3>
+        
+        <div class="trust-gauge">
+            <svg viewBox="0 0 100 100">
+                <circle class="bg-circle" cx="50" cy="50" r="40"></circle>
+                <circle id="gauge-circle" class="progress-circle" cx="50" cy="50" r="40" 
+                        stroke-dasharray="251.2" stroke-dashoffset="251.2"></circle>
+            </svg>
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                <span class="trust-number" id="trust-score-val">0</span>
+                <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Score</span>
+            </div>
+        </div>
+        
+        <div class="trust-level-badge" id="trust-level-badge" style="background-color: var(--text-muted); color: #fff;">
+            Bronze
+        </div>
+        
+        <div style="margin-top: 30px; width: 100%; border-top: 1px solid var(--glass-border); padding-top: 15px;">
+            <div class="trust-metric-row">
+                <span>Verification State:</span>
+                <strong id="verification-percentage">0% Verified</strong>
+            </div>
+            <div class="trust-metric-row">
+                <span>Total Documents:</span>
+                <strong id="verified-docs-count">0/4 Approved</strong>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Upload Grid -->
+    <div class="upload-grid">
+        <!-- Card 1: PAN Verification -->
+        <div class="upload-card" id="card-pan_verification">
+            <div class="upload-icon">
+                <i class="fas fa-address-card"></i>
+            </div>
+            <h4 style="font-weight: 600; margin-bottom: 4px;">PAN Verification</h4>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">Permanent Account Number Card (PDF, PNG, JPG)</p>
+            
+            <div class="status-indicator" style="margin-bottom: 15px;">
+                <span class="badge badge-pending" style="display: none;">Pending</span>
+                <span class="badge badge-approved" style="display: none;">Verified</span>
+                <span class="badge badge-rejected" style="display: none;">Rejected</span>
+                <span class="badge" style="background-color: var(--glass-border); color: var(--text-secondary); display: inline-block;">Not Uploaded</span>
+            </div>
+            
+            <div class="upload-btn-wrapper">
+                <button class="btn btn-outline btn-sm">Upload File</button>
+                <input type="file" name="file" data-type="pan_verification" onchange="uploadFile(this)">
+            </div>
+            <div class="feedback-note" id="feedback-pan_verification"></div>
+        </div>
+        
+        <!-- Card 3: Bank Statement -->
+        <div class="upload-card" id="card-bank_statement">
+            <div class="upload-icon">
+                <i class="fas fa-file-invoice-dollar"></i>
+            </div>
+            <h4 style="font-weight: 600; margin-bottom: 4px;">Financial Audits / Statements</h4>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">Latest 3 months corporate bank statement or audit (PDF)</p>
+            
+            <div class="status-indicator" style="margin-bottom: 15px;">
+                <span class="badge badge-pending" style="display: none;">Pending</span>
+                <span class="badge badge-approved" style="display: none;">Verified</span>
+                <span class="badge badge-rejected" style="display: none;">Rejected</span>
+                <span class="badge" style="background-color: var(--glass-border); color: var(--text-secondary); display: inline-block;">Not Uploaded</span>
+            </div>
+            
+            <div class="upload-btn-wrapper">
+                <button class="btn btn-outline btn-sm">Upload File</button>
+                <input type="file" name="file" data-type="bank_statement" onchange="uploadFile(this)">
+            </div>
+            <div class="feedback-note" id="feedback-bank_statement"></div>
+        </div>
+        
+        <!-- Card 4: Identity Proof -->
+        <div class="upload-card" id="card-identity_proof">
+            <div class="upload-icon">
+                <i class="fas fa-id-card"></i>
+            </div>
+            <h4 style="font-weight: 600; margin-bottom: 4px;">Identity Proof</h4>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">Signatory's Passport, National ID card, Driver's License (PDF, PNG, JPG)</p>
+            
+            <div class="status-indicator" style="margin-bottom: 15px;">
+                <span class="badge badge-pending" style="display: none;">Pending</span>
+                <span class="badge badge-approved" style="display: none;">Verified</span>
+                <span class="badge badge-rejected" style="display: none;">Rejected</span>
+                <span class="badge" style="background-color: var(--glass-border); color: var(--text-secondary); display: inline-block;">Not Uploaded</span>
+            </div>
+            
+            <div class="upload-btn-wrapper">
+                <button class="btn btn-outline btn-sm">Upload File</button>
+                <input type="file" name="file" data-type="identity_proof" onchange="uploadFile(this)">
+            </div>
+            <div class="feedback-note" id="feedback-identity_proof"></div>
+        </div>
+    </div>
+</div>
+
+<div class="glass-panel" style="margin-bottom: 40px;">
+    <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 15px;">Document Upload Logs</h3>
+    <div style="overflow-x: auto;">
+        <table class="data-table" id="logs-table">
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Filename</th>
+                    <th>Upload Date</th>
+                    <th>Status</th>
+                    <th>Details / System Verification Notes</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="logs-tbody">
+                <tr>
+                    <td colspan="6" style="text-align: center; color: var(--text-muted);">No documents uploaded yet.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        loadTrustDetails();
+    });
+
+    function loadTrustDetails() {
+        fetch("/api/vendor/trust-score")
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const score = data.score;
+                    const level = data.level;
+                    const levelColor = data.level_color;
+                    
+                    // Update Score Gauge
+                    document.getElementById('trust-score-val').innerText = score;
+                    const badge = document.getElementById('trust-level-badge');
+                    badge.innerText = level;
+                    badge.style.backgroundColor = levelColor;
+                    
+                    const progressCircle = document.getElementById('gauge-circle');
+                    const circumference = 2 * Math.PI * 40; // 251.2
+                    const offset = circumference - (score / 100) * circumference;
+                    progressCircle.style.strokeDashoffset = offset;
+                    progressCircle.style.stroke = levelColor;
+                    
+                    // Update Count Metrics
+                    const docs = data.documents;
+                    let verifiedCount = 0;
+                    docs.forEach(doc => {
+                        if (doc.status === 'Verified') verifiedCount++;
+                    });
+                    
+                    document.getElementById('verified-docs-count').innerText = `${verifiedCount}/3 Approved`;
+                    document.getElementById('verification-percentage').innerText = `${Math.round((verifiedCount / 3) * 100)}% Verified`;
+                    
+                    // Reset all cards
+                    const docTypes = ['pan_verification', 'bank_statement', 'identity_proof'];
+                    docTypes.forEach(type => {
+                        const card = document.getElementById(`card-${type}`);
+                        card.className = 'upload-card';
+                        const badges = card.querySelectorAll('.status-indicator .badge');
+                        badges.forEach(b => b.style.display = 'none');
+                        badges[3].style.display = 'inline-block'; // Set to Not Uploaded by default
+                        document.getElementById(`feedback-${type}`).innerText = '';
+                    });
+                    
+                    // Update Upload Cards status
+                    docs.forEach(doc => {
+                        const card = document.getElementById(`card-${doc.document_type}`);
+                        const badges = card.querySelectorAll('.status-indicator .badge');
+                        badges.forEach(b => b.style.display = 'none');
+                        
+                        if (doc.status === 'Verified') {
+                            card.classList.add('verified');
+                            badges[1].style.display = 'inline-block';
+                        } else if (doc.status === 'Rejected') {
+                            card.classList.add('rejected');
+                            badges[2].style.display = 'inline-block';
+                        } else {
+                            badges[0].style.display = 'inline-block';
+                        }
+                        
+                        document.getElementById(`feedback-${doc.document_type}`).innerText = doc.verification_notes || '';
+                    });
+                    
+                    // Populate History Log Table
+                    const tbody = document.getElementById('logs-tbody');
+                    tbody.innerHTML = '';
+                    
+                    if (docs.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No documents uploaded yet.</td></tr>`;
+                    } else {
+                        docs.forEach(doc => {
+                            let statusBadge = '';
+                            if (doc.status === 'Verified') {
+                                statusBadge = `<span class="badge badge-approved">Verified</span>`;
+                            } else if (doc.status === 'Rejected') {
+                                statusBadge = `<span class="badge badge-rejected">Rejected</span>`;
+                            } else {
+                                statusBadge = `<span class="badge badge-pending">Pending</span>`;
+                            }
+                            
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `
+                                <td style="font-weight: 600;">${formatDocType(doc.document_type)}</td>
+                                <td style="font-family: monospace; font-size: 0.85rem;">${doc.document_name}</td>
+                                <td>${doc.created_at}</td>
+                                <td>${statusBadge}</td>
+                                <td style="font-size: 0.85rem; color: var(--text-secondary);">${doc.verification_notes || 'Analyzing document...'}</td>
+                                <td>
+                                    <button class="btn btn-outline btn-sm" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.2); padding: 4px 8px;" onclick="deleteDoc(${doc.id})">
+                                        <i class="fas fa-trash-can"></i>
+                                    </button>
+                                </td>
+                            `;
+                            tbody.appendChild(tr);
+                        });
+                    }
+                }
+            });
+    }
+
+    function formatDocType(type) {
+        switch(type) {
+            case 'pan_verification': return 'PAN Verification';
+            case 'bank_statement': return 'Financial Audit / Bank Statement';
+            case 'identity_proof': return 'Identity Proof';
+            default: return type;
+        }
+    }
+
+    function uploadFile(input) {
+        if (!input.files || input.files.length === 0) return;
+        const file = input.files[0];
+        const docType = input.getAttribute('data-type');
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('document_type', docType);
+        
+        // Show pending feedback instantly
+        const card = document.getElementById(`card-${docType}`);
+        const badges = card.querySelectorAll('.status-indicator .badge');
+        badges.forEach(b => b.style.display = 'none');
+        badges[0].style.display = 'inline-block'; // Show Pending badge
+        document.getElementById(`feedback-${docType}`).innerText = 'Uploading and scanning file...';
+        
+        fetch("/api/vendor/upload", {
+            method: "POST",
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message || 'File uploaded successfully!', 'success');
+            } else {
+                showToast(data.error || 'Upload failed', 'error');
+            }
+            loadTrustDetails();
+        })
+        .catch(err => {
+            showToast('Network error during upload.', 'error');
+            loadTrustDetails();
+        });
+    }
+
+    function deleteDoc(id) {
+        if (!confirm("Are you sure you want to delete this document? This will recalculate your Trust Score immediately.")) return;
+        
+        fetch(`/admin/documents/${id}/status`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded"
+            },
+            body: "status=Deleted"
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Document deleted.', 'success');
+            } else {
+                showToast(data.error || 'Delete failed', 'error');
+            }
+            loadTrustDetails();
+        });
+    }
+</script>
+{% endblock %}

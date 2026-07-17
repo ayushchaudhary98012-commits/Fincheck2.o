@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+
+{% block title %}FinCheck | Prediction Result{% endblock %}
+
+{% block content %}
+<div class="dashboard-content" style="max-width: 1200px; margin: 0 auto;">
+    <div class="result-header">
+        <h1>Application Status: 
+            {% if status == 'Approved' %}
+                <span style="color: var(--success);">Approved</span>
+            {% elif status == 'Moderate' %}
+                <span style="color: var(--warning);">Moderate Eligibility</span>
+            {% else %}
+                <span style="color: var(--danger);">Rejected</span>
+            {% endif %}
+        </h1>
+        <p>Real-time AI credit assessment for <strong>{{ app.full_name }}</strong> (Ref: #AP-{{ app.id }})</p>
+    </div>
+    
+    <div class="result-grid">
+        <!-- Left: Score Card -->
+        <div class="glass-panel score-gauge-card">
+            <h3 style="font-weight: 600; color: var(--text-secondary);">Eligibility Score</h3>
+            
+            <div class="gauge-chart-container">
+                <canvas id="gauge-chart" data-score="{{ app.eligibility_score }}"></canvas>
+                <div class="score-display">
+                    <div class="score-value" style="color: 
+                        {% if app.eligibility_score >= 70 %}var(--success)
+                        {% elif app.eligibility_score >= 40 %}var(--warning)
+                        {% else %}var(--danger){% endif %};">
+                        {{ app.eligibility_score }}
+                    </div>
+                    <div class="score-label">Out of 100</div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 10px; width: 100%;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.95rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 8px;">
+                    <span style="color: var(--text-secondary);">Risk Level:</span>
+                    <strong style="color: 
+                        {% if app.risk_level == 'Low' %}var(--success)
+                        {% elif app.risk_level == 'Medium' %}var(--warning)
+                        {% else %}var(--danger){% endif %};">{{ app.risk_level }}</strong>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; font-size: 0.95rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 8px;">
+                    <span style="color: var(--text-secondary);">Approval Chance:</span>
+                    <strong>{{ "%.1f"|format(app.approval_probability * 100) }}%</strong>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; font-size: 0.95rem; padding-bottom: 8px;">
+                    <span style="color: var(--text-secondary);">Requested Loan:</span>
+                    <strong>₹{{ "{:,.2f}".format(app.loan_amount) }}</strong>
+                </div>
+            </div>
+            
+            <div style="margin-top: 24px; display: flex; flex-direction: column; gap: 12px; width: 100%;">
+                <a href="/api/applications/{{ app.id }}/pdf" class="btn btn-primary" style="width: 100%;">
+                    <i class="fas fa-file-pdf"></i> Download PDF Report
+                </a>
+                <a href="/applicant/dashboard" class="btn btn-secondary" style="width: 100%;">
+                    <i class="fas fa-columns"></i> Go to Dashboard
+                </a>
+            </div>
+        </div>
+        
+        <!-- Right: Financial Health & XAI -->
+        <div class="glass-panel analysis-card">
+            <!-- Progress Ratios -->
+            <div class="analysis-title">
+                <i class="fas fa-chart-simple" style="color: var(--primary);"></i> Financial Health Indicators
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 20px; margin-bottom: 35px;">
+                <!-- Debt to Income -->
+                <div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.9rem;">
+                        <span style="font-weight: 500;">Debt-to-Income (DTI) Ratio</span>
+                        <strong style="color: {% if ratios.dti <= 0.36 %}var(--success){% elif ratios.dti <= 0.5 %}var(--warning){% else %}var(--danger){% endif %};">
+                            {{ "%.1f"|format(ratios.dti * 100) }}%
+                        </strong>
+                    </div>
+                    <div style="width: 100%; height: 8px; background-color: var(--bg-tertiary); border-radius: 4px; overflow: hidden;">
+                        <div style="width: {{ [ratios.dti * 100, 100]|min }}%; height: 100%; background-color: {% if ratios.dti <= 0.36 %}var(--success){% elif ratios.dti <= 0.5 %}var(--warning){% else %}var(--danger){% endif %}; border-radius: 4px;"></div>
+                    </div>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">Recommended DTI ratio is below 36% for prime loan eligibility.</span>
+                </div>
+                
+                <!-- Loan to Annual Income -->
+                <div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.9rem;">
+                        <span style="font-weight: 500;">Loan-to-Annual Income Ratio</span>
+                        <strong style="color: {% if ratios.lti <= 3.0 %}var(--success){% elif ratios.lti <= 5.0 %}var(--warning){% else %}var(--danger){% endif %};">
+                            {{ "%.1f"|format(ratios.lti) }}x
+                        </strong>
+                    </div>
+                    <div style="width: 100%; height: 8px; background-color: var(--bg-tertiary); border-radius: 4px; overflow: hidden;">
+                        <div style="width: {{ [ratios.lti * 20, 100]|min }}%; height: 100%; background-color: {% if ratios.lti <= 3.0 %}var(--success){% elif ratios.lti <= 5.0 %}var(--warning){% else %}var(--danger){% endif %}; border-radius: 4px;"></div>
+                    </div>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">A requested loan larger than 5x annual income significantly increases financial leverage risk.</span>
+                </div>
+            </div>
+            
+            <!-- XAI Reasons -->
+            <div class="analysis-title">
+                <i class="fas fa-brain" style="color: var(--primary);"></i> Explainable AI (XAI) Risk Factors
+            </div>
+            
+            <ul class="reasons-list">
+                {% if reasons %}
+                    {% for reason in reasons %}
+                        <li class="{% if reason.type == 'pro' %}pro{% else %}con{% endif %}">
+                            <i class="fas {% if reason.type == 'pro' %}fa-circle-check{% else %}fa-circle-xmark{% endif %}"></i>
+                            <span>{{ reason.text }}</span>
+                        </li>
+                    {% endfor %}
+                {% else %}
+                    <li>No specific factors found. Overall criteria met standard guidelines.</li>
+                {% endif %}
+            </ul>
+            
+            <!-- Suggestions -->
+            <div class="analysis-title">
+                <i class="fas fa-lightbulb" style="color: var(--primary);"></i> Recommendations to Improve Score
+            </div>
+            
+            <ul class="suggestions-list">
+                {% if suggestions %}
+                    {% for suggestion in suggestions %}
+                        <li>
+                            <i class="fas fa-circle-arrow-up"></i>
+                            <span>{{ suggestion }}</span>
+                        </li>
+                    {% endfor %}
+                {% else %}
+                    <li><i class="fas fa-circle-arrow-up"></i> Your application stands strong. Keep maintaining your financial profile.</li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+
+    <!-- Vendor Document Verification Status Table -->
+    <div class="glass-panel" style="margin-top: 30px; padding: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3 style="font-size: 1.15rem; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-shield-halved" style="color: var(--primary);"></i>
+                Vendor Trust Score & Verification Status
+            </h3>
+            <span class="badge" style="background-color: {{ trust_color }}; color: white; font-weight: 600; padding: 6px 12px; font-size: 0.85rem;">
+                Trust Score: {{ trust_score }} / 100 ({{ trust_level }})
+            </span>
+        </div>
+        
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 20px;">
+            The trust score represents vendor verification check integrity. Lenders use these documents to audit company legitimacy.
+        </p>
+        
+        <div style="overflow-x: auto;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Document Filename</th>
+                        <th>Upload Date</th>
+                        <th>Status</th>
+                        <th>Verification Feedback & Notes</th>
+                        {% if session.get('role') == 'admin' %}
+                            <th>Lender Action</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if docs %}
+                        {% for doc in docs %}
+                            <tr>
+                                <td style="font-weight: 600;">
+                                    {% if doc.document_type == 'pan_verification' %}PAN Verification
+                                    {% elif doc.document_type == 'bank_statement' %}Financial Audit / Statements
+                                    {% elif doc.document_type == 'identity_proof' %}Identity Proof
+                                    {% else %}{{ doc.document_type }}{% endif %}
+                                </td>
+                                <td style="font-family: monospace; font-size: 0.85rem;">{{ doc.document_name }}</td>
+                                <td>{{ doc.created_at }}</td>
+                                <td>
+                                    <span class="badge 
+                                        {% if doc.status == 'Verified' %}badge-approved
+                                        {% elif doc.status == 'Rejected' %}badge-rejected
+                                        {% else %}badge-pending{% endif %}">
+                                        {{ doc.status }}
+                                    </span>
+                                </td>
+                                <td>{{ doc.verification_notes or 'Processing automated verification...' }}</td>
+                                {% if session.get('role') == 'admin' %}
+                                    <td>
+                                        <div style="display: flex; gap: 8px;">
+                                            <form action="/admin/documents/{{ doc.id }}/status" method="POST" style="margin: 0;">
+                                                <input type="hidden" name="status" value="Verified">
+                                                <input type="hidden" name="redirect_url" value="/result/{{ app.id }}">
+                                                <button type="submit" class="btn btn-primary" style="padding: 6px 12px; font-size: 0.75rem; background-color: var(--success); border-color: var(--success); font-weight: 600;">
+                                                    Verify
+                                                </button>
+                                            </form>
+                                            <form action="/admin/documents/{{ doc.id }}/status" method="POST" style="margin: 0;">
+                                                <input type="hidden" name="status" value="Rejected">
+                                                <input type="hidden" name="redirect_url" value="/result/{{ app.id }}">
+                                                <button type="submit" class="btn btn-outline" style="padding: 6px 12px; font-size: 0.75rem; color: var(--danger); border-color: rgba(239, 68, 68, 0.3); font-weight: 600;">
+                                                    Reject
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                {% endif %}
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="{% if session.get('role') == 'admin' %}6{% else %}5{% endif %}" style="text-align: center; color: var(--text-muted); padding: 20px;">
+                                No verification documents uploaded yet.
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+{% endblock %}

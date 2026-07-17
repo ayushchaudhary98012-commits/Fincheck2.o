@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block title %}FinCheck | Applicant Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; padding: 0 16px;">Menu</div>
+        <ul class="sidebar-menu">
+            <li>
+                <a href="/applicant/dashboard" class="sidebar-link active">
+                    <i class="fas fa-chart-pie"></i> Portal Overview
+                </a>
+            </li>
+            <li>
+                <a href="/apply" class="sidebar-link">
+                    <i class="fas fa-paper-plane"></i> Apply for Loan
+                </a>
+            </li>
+            <li>
+                <a href="/calculator" class="sidebar-link">
+                    <i class="fas fa-calculator"></i> EMI Calculator
+                </a>
+            </li>
+            <li>
+                <a href="/applicant/verification" class="sidebar-link">
+                    <i class="fas fa-shield-halved"></i> Verify Trust
+                </a>
+            </li>
+        </ul>
+    </aside>
+    
+    <!-- Main Content Area -->
+    <main class="dashboard-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+            <div>
+                <h1 style="font-size: 1.85rem; font-weight: 700; margin-bottom: 6px;">Welcome Back, {{ session.get('username') }}!</h1>
+                <p style="color: var(--text-secondary);">Monitor your financial checkups and loan eligibility applications.</p>
+            </div>
+            <a href="/apply" class="btn btn-primary">
+                <i class="fas fa-plus"></i> New Application
+            </a>
+        </div>
+        
+        <!-- Quick Stats Grid -->
+        <div class="stats-grid">
+            <div class="glass-panel stat-card">
+                <div class="stat-info">
+                    <h3>Submitted Checks</h3>
+                    <div class="stat-value">{{ apps|length }}</div>
+                </div>
+                <div class="stat-icon">
+                    <i class="fas fa-folder-open"></i>
+                </div>
+            </div>
+            
+            <div class="glass-panel stat-card approved">
+                <div class="stat-info">
+                    <h3>Eligible Decisions</h3>
+                    <div class="stat-value">
+                        {{ apps|selectattr('status', 'equalto', 'Approved')|list|length + apps|selectattr('status', 'equalto', 'Moderate')|list|length }}
+                    </div>
+                </div>
+                <div class="stat-icon">
+                    <i class="fas fa-circle-check"></i>
+                </div>
+            </div>
+            
+            <div class="glass-panel stat-card rejected">
+                <div class="stat-info">
+                    <h3>Ineligible Decisions</h3>
+                    <div class="stat-value">
+                        {{ apps|selectattr('status', 'equalto', 'Rejected')|list|length }}
+                    </div>
+                </div>
+                <div class="stat-icon">
+                    <i class="fas fa-circle-xmark"></i>
+                </div>
+            </div>
+
+            <div class="glass-panel stat-card" style="border-left: 4px solid var(--primary); cursor: pointer;" onclick="location.href='/applicant/verification'">
+                <div class="stat-info">
+                    <h3>Trust Rating</h3>
+                    <div class="stat-value" style="display: flex; align-items: baseline; gap: 6px;">
+                        <span>{{ trust_score }}</span>
+                        <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">({{ trust_level }})</span>
+                    </div>
+                </div>
+                <div class="stat-icon">
+                    <i class="fas fa-shield-halved" style="color: var(--primary);"></i>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Application History Table -->
+        <div class="glass-panel table-card">
+            <div class="table-header">
+                <h3>Application History</h3>
+            </div>
+            
+            <div class="table-wrapper">
+                {% if apps %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Ref ID</th>
+                                <th>Applicant</th>
+                                <th>Loan Type</th>
+                                <th>Loan Amount</th>
+                                <th>Score</th>
+                                <th>Status</th>
+                                <th>Date Checked</th>
+                                <th style="text-align: right;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for app in apps %}
+                                <tr>
+                                    <td><strong>#AP-{{ app.id }}</strong></td>
+                                    <td>{{ app.full_name }}</td>
+                                    <td>{{ app.loan_type }}</td>
+                                    <td>₹{{ "{:,.2f}".format(app.loan_amount) }}</td>
+                                    <td>
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            <strong>{{ app.eligibility_score }}</strong>/100
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if app.status == 'Approved' %}badge-approved
+                                            {% elif app.status == 'Moderate' %}badge-moderate
+                                            {% elif app.status == 'Rejected' %}badge-rejected
+                                            {% else %}badge-pending{% endif %}">
+                                            {{ app.status }}
+                                        </span>
+                                    </td>
+                                    <td>{{ app.created_at[:10] }}</td>
+                                    <td style="text-align: right; display: flex; justify-content: flex-end; gap: 8px;">
+                                        <a href="/result/{{ app.id }}" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;">
+                                            <i class="fas fa-chart-line"></i> Analysis
+                                        </a>
+                                        <a href="/api/applications/{{ app.id }}/pdf" class="btn btn-outline" style="padding: 6px 12px; font-size: 0.8rem;" title="Download PDF Report">
+                                            <i class="fas fa-file-pdf"></i> PDF
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div style="text-align: center; padding: 40px 20px;">
+                        <i class="fas fa-file-invoice" style="font-size: 3rem; color: var(--text-muted); margin-bottom: 16px;"></i>
+                        <h4>No Applications Found</h4>
+                        <p style="color: var(--text-muted); margin-bottom: 20px;">You haven't run any financial assessments yet.</p>
+                        <a href="/apply" class="btn btn-primary">Run First Assessment</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}

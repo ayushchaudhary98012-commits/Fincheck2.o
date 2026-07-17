@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}FinCheck | AI-Powered Loan Eligibility & Financial Analysis{% endblock %}</title>
+    <!-- Meta tags for SEO -->
+    <meta name="description" content="Check your loan eligibility status, calculate monthly EMI, and get personalized financial health feedback using FinCheck's AI engine.">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Main CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <!-- Inline script to prevent theme flashing -->
+    <script>
+        (function() {
+            const storedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', storedTheme);
+        })();
+    </script>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <a href="/" class="nav-brand">
+            <i class="fas fa-shield-halved"></i>
+            <span>Fin</span>Check
+        </a>
+        
+        <ul class="nav-menu">
+            <li><a href="/" class="nav-link">Home</a></li>
+            <li><a href="/calculator" class="nav-link">EMI Calculator</a></li>
+            {% if session.get('user_id') %}
+                {% if session.get('role') == 'admin' %}
+                    <li><a href="/admin/dashboard" class="nav-link">Lender Portal</a></li>
+                {% else %}
+                    <li><a href="/applicant/dashboard" class="nav-link">My Dashboard</a></li>
+                    <li><a href="/applicant/verification" class="nav-link">Verify Trust</a></li>
+                {% endif %}
+            {% endif %}
+        </ul>
+        
+        <div class="nav-actions">
+            <!-- Theme Toggle Button -->
+            <button id="theme-toggle" class="theme-toggle" title="Toggle Light/Dark Theme">
+                <i class="fas fa-moon"></i>
+            </button>
+            
+            {% if session.get('user_id') %}
+                <span class="user-greeting" style="font-size: 0.9rem; font-weight: 500; color: var(--text-secondary);">
+                    Hi, <strong>{{ session.get('username') }}</strong>
+                </span>
+                <a href="/logout" class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.85rem;">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            {% else %}
+                <a href="/login" class="btn btn-outline" style="padding: 8px 16px; font-size: 0.85rem;">Login</a>
+                <a href="/login?register=true" class="btn btn-primary" style="padding: 8px 16px; font-size: 0.85rem;">Apply Now</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <!-- Main Content Block -->
+    {% block content %}
+    {% endblock %}
+
+    <!-- Footer -->
+    <footer>
+        <div>&copy; 2026 FinCheck Financial Corp. All rights reserved.</div>
+        <div style="display: flex; gap: 20px;">
+            <a href="#" style="color: var(--text-muted); text-decoration: none;">Privacy Policy</a>
+            <a href="#" style="color: var(--text-muted); text-decoration: none;">Terms of Service</a>
+        </div>
+    </footer>
+
+    <!-- Toast Notifications Container -->
+    <div id="toast-container"></div>
+
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Core JS -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
+
+    <!-- Display Flask Flash Messages as Toasts -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <script>
+                document.addEventListener('DOMContentLoaded', () => {
+                    {% for category, message in messages %}
+                        showToast("{{ message }}", "{{ 'success' if category == 'success' else 'error' if category == 'error' else 'info' }}");
+                    {% endfor %}
+                });
+            </script>
+        {% endif %}
+    {% endwith %}
+</body>
+</html>

@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}FinCheck | Authentication{% endblock %}
+
+{% block content %}
+<div class="glass-panel form-container">
+    <div style="display: flex; border-bottom: 1px solid var(--glass-border); margin-bottom: 30px;">
+        <button id="tab-login" class="btn" style="flex: 1; border-radius: 0; background: none; border-bottom: 2px solid var(--primary); font-weight: 600; color: var(--primary);">Login</button>
+        <button id="tab-register" class="btn" style="flex: 1; border-radius: 0; background: none; border-bottom: 2px solid transparent; font-weight: 500; color: var(--text-secondary);">Register</button>
+    </div>
+    
+    <!-- Login Form -->
+    <form id="form-login" action="/login" method="POST" style="display: block;">
+        <input type="hidden" name="action" value="login">
+        
+        <div class="form-header">
+            <h2>Welcome Back</h2>
+            <p>Access your applicant portal or lender dashboard.</p>
+        </div>
+        
+        <div class="form-group">
+            <label for="login-username">Username</label>
+            <input type="text" id="login-username" name="username" class="form-control" placeholder="Enter your username" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="login-password">Password</label>
+            <input type="password" id="login-password" name="password" class="form-control" placeholder="Enter your password" required>
+        </div>
+        
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">
+            <i class="fas fa-sign-in-alt"></i> Login
+        </button>
+    </form>
+    
+    <!-- Register Form -->
+    <form id="form-register" action="/login" method="POST" style="display: none;">
+        <input type="hidden" name="action" value="register">
+        
+        <div class="form-header">
+            <h2>Create Account</h2>
+            <p>Join FinCheck and check your eligibility instantly.</p>
+        </div>
+        
+        <div class="form-group">
+            <label for="reg-username">Username</label>
+            <input type="text" id="reg-username" name="username" class="form-control" placeholder="Choose a username" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="reg-email">Email Address</label>
+            <input type="email" id="reg-email" name="email" class="form-control" placeholder="name@example.com" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="reg-phone">Phone Number</label>
+            <input type="tel" id="reg-phone" name="phone" class="form-control" placeholder="e.g. +1 555-0199" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="reg-role">Account Type</label>
+            <select id="reg-role" name="role" class="form-control" required>
+                <option value="applicant">Applicant / Vendor</option>
+                <option value="admin">Lender / Admin</option>
+            </select>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label for="reg-password">Password</label>
+                <input type="password" id="reg-password" name="password" class="form-control" placeholder="Create password" required>
+            </div>
+            <div class="form-group">
+                <label for="reg-confirm">Confirm Password</label>
+                <input type="password" id="reg-confirm" name="confirm_password" class="form-control" placeholder="Repeat password" required>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">
+            <i class="fas fa-user-plus"></i> Register
+        </button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const tabLogin = document.getElementById('tab-login');
+        const tabRegister = document.getElementById('tab-register');
+        const formLogin = document.getElementById('form-login');
+        const formRegister = document.getElementById('form-register');
+        
+        function showLogin() {
+            formLogin.style.display = 'block';
+            formRegister.style.display = 'none';
+            tabLogin.style.borderBottomColor = 'var(--primary)';
+            tabLogin.style.color = 'var(--primary)';
+            tabLogin.style.fontWeight = '600';
+            tabRegister.style.borderBottomColor = 'transparent';
+            tabRegister.style.color = 'var(--text-secondary)';
+            tabRegister.style.fontWeight = '500';
+        }
+        
+        function showRegister() {
+            formLogin.style.display = 'none';
+            formRegister.style.display = 'block';
+            tabRegister.style.borderBottomColor = 'var(--primary)';
+            tabRegister.style.color = 'var(--primary)';
+            tabRegister.style.fontWeight = '600';
+            tabLogin.style.borderBottomColor = 'transparent';
+            tabLogin.style.color = 'var(--text-secondary)';
+            tabLogin.style.fontWeight = '500';
+        }
+        
+        tabLogin.addEventListener('click', showLogin);
+        tabRegister.addEventListener('click', showRegister);
+        
+        // Handle URL query parameters to open register directly
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('register') === 'true') {
+            showRegister();
+        }
+        
+        // Password matching validation
+        formRegister.addEventListener('submit', (e) => {
+            const pass = document.getElementById('reg-password').value;
+            const confirm = document.getElementById('reg-confirm').value;
+            if (pass !== confirm) {
+                e.preventDefault();
+                showToast('Passwords do not match.', 'error');
+            }
+        });
+    });
+</script>
+{% endblock %}

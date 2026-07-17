@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+
+{% block title %}FinCheck | Lender Administration Portal{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; padding: 0 16px;">Menu</div>
+        <ul class="sidebar-menu">
+            <li>
+                <a href="/admin/dashboard" class="sidebar-link active">
+                    <i class="fas fa-gauge"></i> Lender Dashboard
+                </a>
+            </li>
+            <li>
+                <a href="/calculator" class="sidebar-link">
+                    <i class="fas fa-calculator"></i> EMI Calculator
+                </a>
+            </li>
+        </ul>
+    </aside>
+    
+    <!-- Main Content Area -->
+    <main class="dashboard-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+            <div>
+                <h1 style="font-size: 1.85rem; font-weight: 700; margin-bottom: 6px;">Lender Administration Portal</h1>
+                <p style="color: var(--text-secondary);">Manage applicants, review risks, and override decision statuses.</p>
+            </div>
+        </div>
+        
+        <!-- Aggregated Metrics -->
+        <div class="stats-grid">
+            <div class="glass-panel stat-card">
+                <div class="stat-info">
+                    <h3>Total Submissions</h3>
+                    <div class="stat-value">{{ total_count }}</div>
+                </div>
+                <div class="stat-icon">
+                    <i class="fas fa-folder-open"></i>
+                </div>
+            </div>
+            
+            <div class="glass-panel stat-card approved">
+                <div class="stat-info">
+                    <h3>Approved Loans</h3>
+                    <div class="stat-value">{{ approved_count }}</div>
+                </div>
+                <div class="stat-icon">
+                    <i class="fas fa-circle-check"></i>
+                </div>
+            </div>
+            
+            <div class="glass-panel stat-card rejected">
+                <div class="stat-info">
+                    <h3>Rejected Loans</h3>
+                    <div class="stat-value">{{ rejected_count }}</div>
+                </div>
+                <div class="stat-icon">
+                    <i class="fas fa-circle-xmark"></i>
+                </div>
+            </div>
+            
+            <div class="glass-panel stat-card pending">
+                <div class="stat-info">
+                    <h3>Pending Checks</h3>
+                    <div class="stat-value">{{ pending_count }}</div>
+                </div>
+                <div class="stat-icon">
+                    <i class="fas fa-clock"></i>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Chart.js Analysis Row -->
+        <div style="display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 24px; margin-bottom: 40px; min-height: 300px;">
+            <div class="glass-panel" style="padding: 20px; display: flex; flex-direction: column; align-items: center;">
+                <h4 style="margin-bottom: 15px; font-weight: 600; text-align: center;">Approval Statistics</h4>
+                <div style="position: relative; width: 100%; height: 220px;">
+                    <canvas id="approval-pie-chart"></canvas>
+                </div>
+            </div>
+            
+            <div class="glass-panel" style="padding: 20px; display: flex; flex-direction: column; align-items: center;">
+                <h4 style="margin-bottom: 15px; font-weight: 600; text-align: center;">Monthly Submissions Trend</h4>
+                <div style="position: relative; width: 100%; height: 220px;">
+                    <canvas id="monthly-bar-chart"></canvas>
+                </div>
+            </div>
+            
+            <div class="glass-panel" style="padding: 20px; display: flex; flex-direction: column; align-items: center;">
+                <h4 style="margin-bottom: 15px; font-weight: 600; text-align: center;">Risk Level Distribution</h4>
+                <div style="position: relative; width: 100%; height: 220px;">
+                    <canvas id="risk-doughnut-chart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Search and Filters Panel -->
+        <div class="glass-panel" style="padding: 24px; margin-bottom: 24px;">
+            <div class="search-filter-bar">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="search-input" class="form-control" placeholder="Search applicant, phone, or email..." value="{{ search }}">
+                </div>
+                
+                <select id="status-filter" class="form-control filter-select">
+                    <option value="">All Statuses</option>
+                    <option value="Approved" {% if status == 'Approved' %}selected{% endif %}>Approved</option>
+                    <option value="Moderate" {% if status == 'Moderate' %}selected{% endif %}>Moderate</option>
+                    <option value="Rejected" {% if status == 'Rejected' %}selected{% endif %}>Rejected</option>
+                    <option value="Pending" {% if status == 'Pending' %}selected{% endif %}>Pending</option>
+                </select>
+                
+                <select id="loan-type-filter" class="form-control filter-select">
+                    <option value="">All Loan Types</option>
+                    <option value="Home" {% if loan_type == 'Home' %}selected{% endif %}>Home Loan</option>
+                    <option value="Personal" {% if loan_type == 'Personal' %}selected{% endif %}>Personal Loan</option>
+                    <option value="Education" {% if loan_type == 'Education' %}selected{% endif %}>Education Loan</option>
+                    <option value="Business" {% if loan_type == 'Business' %}selected{% endif %}>Business Loan</option>
+                </select>
+                
+                <button type="button" class="btn btn-primary" onclick="applyFilters()">
+                    <i class="fas fa-filter"></i> Apply Filters
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="resetFilters()">
+                    Reset
+                </button>
+            </div>
+        </div>
+        
+        <!-- Applications Management Table -->
+        <div class="glass-panel table-card">
+            <div class="table-header">
+                <h3>Loan Applications Queue</h3>
+            </div>
+            
+            <div class="table-wrapper">
+                {% if apps %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Ref ID</th>
+                                <th>Applicant</th>
+                                <th>Loan Type</th>
+                                <th>Loan Amount</th>
+                                <th>AI Score</th>
+                                <th>Trust Score</th>
+                                <th>Risk Level</th>
+                                <th>Decided Status</th>
+                                <th style="text-align: right;">Manage Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for app in apps %}
+                                <tr>
+                                    <td><strong>#AP-{{ app.id }}</strong></td>
+                                    <td>
+                                        <div style="font-weight: 500;">{{ app.full_name }}</div>
+                                        <div style="font-size: 0.75rem; color: var(--text-muted);">{{ app.email }}</div>
+                                    </td>
+                                    <td>{{ app.loan_type }}</td>
+                                    <td>₹{{ "{:,.2f}".format(app.loan_amount) }}</td>
+                                    <td>
+                                        <div style="font-weight: 600;">{{ app.eligibility_score }}</div>
+                                    </td>
+                                    <td>
+                                        <span class="badge" style="background-color: {{ app.trust_color }}; color: white; font-weight: 600; padding: 4px 8px; font-size: 0.75rem; border-radius: 4px;">
+                                            {{ app.trust_score }} ({{ app.trust_level }})
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if app.risk_level == 'Low' %}badge-approved
+                                            {% elif app.risk_level == 'Medium' %}badge-moderate
+                                            {% else %}badge-rejected{% endif %}">
+                                            {{ app.risk_level }} Risk
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <!-- Inline status override form -->
+                                        <form action="/admin/applications/{{ app.id }}/status" method="POST" style="display: flex; align-items: center; gap: 8px;">
+                                            <select name="status" class="form-control" onchange="this.form.submit()" style="padding: 6px 12px; font-size: 0.85rem; width: 110px; height: 32px; border-radius: 6px;">
+                                                <option value="Approved" {% if app.status == 'Approved' %}selected{% endif %}>Approved</option>
+                                                <option value="Moderate" {% if app.status == 'Moderate' %}selected{% endif %}>Moderate</option>
+                                                <option value="Rejected" {% if app.status == 'Rejected' %}selected{% endif %}>Rejected</option>
+                                                <option value="Pending" {% if app.status == 'Pending' %}selected{% endif %}>Pending</option>
+                                            </select>
+                                        </form>
+                                    </td>
+                                    <td style="text-align: right; display: flex; justify-content: flex-end; gap: 8px; align-items: center;">
+                                        <a href="/result/{{ app.id }}" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" title="View Analysis Details">
+                                            <i class="fas fa-magnifying-glass"></i> View
+                                        </a>
+                                        <form action="/admin/applications/{{ app.id }}/delete" method="POST" onsubmit="return confirm('Are you sure you want to delete this application? This action is permanent.');" style="margin: 0;">
+                                            <button type="submit" class="btn btn-danger" style="padding: 6px 12px; font-size: 0.8rem;" title="Delete Application">
+                                                <i class="fas fa-trash-can"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    
+                    <!-- Pagination Nav -->
+                    {% if total_pages > 1 %}
+                        <div style="display: flex; justify-content: center; gap: 10px; margin-top: 30px; align-items: center;">
+                            {% if page > 1 %}
+                                <a href="javascript:goToPage({{ page - 1 }})" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.85rem;">
+                                    <i class="fas fa-chevron-left"></i> Prev
+                                </a>
+                            {% endif %}
+                            
+                            <span style="font-size: 0.9rem; color: var(--text-secondary);">Page <strong>{{ page }}</strong> of {{ total_pages }}</span>
+                            
+                            {% if page < total_pages %}
+                                <a href="javascript:goToPage({{ page + 1 }})" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.85rem;">
+                                    Next <i class="fas fa-chevron-right"></i>
+                                </a>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <div style="text-align: center; padding: 40px 20px;">
+                        <i class="fas fa-folder-open" style="font-size: 3rem; color: var(--text-muted); margin-bottom: 16px;"></i>
+                        <h4>No Applications in Queue</h4>
+                        <p style="color: var(--text-muted);">Adjust your filter criteria or wait for new applicant submissions.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script>
+    const searchInput = document.getElementById('search-input');
+    const statusFilter = document.getElementById('status-filter');
+    const loanTypeFilter = document.getElementById('loan-type-filter');
+    
+    function applyFilters() {
+        const search = searchInput.value.trim();
+        const status = statusFilter.value;
+        const loanType = loanTypeFilter.value;
+        
+        let url = new URL(window.location.href);
+        url.searchParams.set('page', 1);
+        if (search) url.searchParams.set('search', search); else url.searchParams.delete('search');
+        if (status) url.searchParams.set('status', status); else url.searchParams.delete('status');
+        if (loanType) url.searchParams.set('loan_type', loanType); else url.searchParams.delete('loan_type');
+        
+        window.location.href = url.toString();
+    }
+    
+    function resetFilters() {
+        let url = new URL(window.location.href);
+        url.search = '';
+        window.location.href = url.pathname;
+    }
+    
+    function goToPage(pageNum) {
+        let url = new URL(window.location.href);
+        url.searchParams.set('page', pageNum);
+        window.location.href = url.toString();
+    }
+    
+    // Support enter key on search input
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            applyFilters();
+        }
+    });
+</script>
+{% endblock %}

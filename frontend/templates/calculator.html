@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}FinCheck | Interactive Loan EMI Calculator{% endblock %}
+
+{% block content %}
+<div class="glass-panel calculator-container">
+    <div class="form-header">
+        <h2>Interactive EMI Calculator</h2>
+        <p>Calculate your estimated monthly payments, total interest payable, and plan your loan amortization details.</p>
+    </div>
+    
+    <div class="calc-grid">
+        <!-- Sliders Column -->
+        <div>
+            <!-- Amount -->
+            <div class="slider-group">
+                <div class="slider-header">
+                    <span>Loan Amount (₹)</span>
+                    <span id="calc-amount-val" class="slider-val">₹100,000</span>
+                </div>
+                <input type="range" id="calc-amount" class="range-slider" min="5000" max="500000" step="5000" value="100000">
+                <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+                    <span>Min: ₹5k</span>
+                    <span>Max: ₹500k</span>
+                </div>
+            </div>
+            
+            <!-- Rate -->
+            <div class="slider-group">
+                <div class="slider-header">
+                    <span>Annual Interest Rate (%)</span>
+                    <span id="calc-rate-val" class="slider-val">9.0%</span>
+                </div>
+                <input type="range" id="calc-rate" class="range-slider" min="1" max="25" step="0.1" value="9.0">
+                <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+                    <span>Min: 1%</span>
+                    <span>Max: 25%</span>
+                </div>
+            </div>
+            
+            <!-- Tenure -->
+            <div class="slider-group">
+                <div class="slider-header">
+                    <span>Loan Tenure (Years)</span>
+                    <span id="calc-tenure-val" class="slider-val">10 Years</span>
+                </div>
+                <input type="range" id="calc-tenure" class="range-slider" min="1" max="30" step="1" value="10">
+                <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+                    <span>Min: 1 Yr</span>
+                    <span>Max: 30 Yrs</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Results Column -->
+        <div class="glass-panel calc-result-card">
+            <div class="calc-emi-display">
+                <h4 style="font-weight: 500; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 1px;">Monthly Repayment</h4>
+                <div id="calc-emi-val" class="emi-val">₹1,267</div>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Based on standard amortization rates</p>
+            </div>
+            
+            <div class="calc-breakdown">
+                <div class="breakdown-row">
+                    <span>Principal Amount:</span>
+                    <span id="calc-principal-val">₹100,000</span>
+                </div>
+                <div class="breakdown-row">
+                    <span>Total Interest Payable:</span>
+                    <span id="calc-interest-val" style="color: var(--warning);">₹52,011</span>
+                </div>
+                <div style="height: 1px; background-color: var(--glass-border); margin: 8px 0;"></div>
+                <div class="breakdown-row" style="font-size: 1.1rem; font-weight: 700;">
+                    <span style="color: var(--text-primary);">Total Repayment:</span>
+                    <span id="calc-total-val" style="color: var(--primary); font-weight: 700;">₹152,011</span>
+                </div>
+            </div>
+            
+            {% if not session.get('user_id') %}
+                <a href="/login" class="btn btn-primary" style="margin-top: 30px; width: 100%;">
+                    Apply for a Loan Now <i class="fas fa-arrow-right"></i>
+                </a>
+            {% else %}
+                <a href="/apply" class="btn btn-primary" style="margin-top: 30px; width: 100%;">
+                    Check Loan Eligibility <i class="fas fa-arrow-right"></i>
+                </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/calculator.js') }}"></script>
+{% endblock %}

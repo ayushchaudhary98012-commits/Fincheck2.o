@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}FinCheck | AI-Powered Financial Health Analysis{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero">
+    <div class="hero-content">
+        <h1>Assess Your <span>Loan Eligibility</span> in Seconds.</h1>
+        <p>FinCheck uses advanced machine learning models and explainable AI to analyze your financial health and determine your loan eligibility status with granular risk breakdown.</p>
+        <div class="hero-buttons">
+            {% if session.get('user_id') %}
+                <a href="/apply" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Apply for Loan</a>
+            {% else %}
+                <a href="/login" class="btn btn-primary"><i class="fas fa-user-plus"></i> Get Started Now</a>
+            {% endif %}
+            <a href="/calculator" class="btn btn-secondary"><i class="fas fa-calculator"></i> EMI Calculator</a>
+        </div>
+    </div>
+    
+    <!-- Hero Image/Mockup Grid -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; animation: fadeIn 0.8s ease;">
+        <div class="glass-panel" style="padding: 30px; display: flex; flex-direction: column; justify-content: space-between; height: 180px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-weight: 600; font-size: 1.1rem; color: var(--text-secondary);">Approval Speed</div>
+                <div class="badge badge-approved" style="font-size: 0.75rem;">Instant</div>
+            </div>
+            <div style="font-size: 2.2rem; font-weight: 800; color: var(--primary);">~ 3.5 Sec</div>
+            <div style="font-size: 0.85rem; color: var(--text-muted);">AI inference and validation time</div>
+        </div>
+        
+        <div class="glass-panel" style="padding: 30px; display: flex; flex-direction: column; justify-content: space-between; height: 180px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-weight: 600; font-size: 1.1rem; color: var(--text-secondary);">Security Level</div>
+                <i class="fas fa-lock" style="color: var(--success); font-size: 1.2rem;"></i>
+            </div>
+            <div style="font-size: 2.2rem; font-weight: 800; color: var(--success);">Military</div>
+            <div style="font-size: 0.85rem; color: var(--text-muted);">AES encryption & SQL protection</div>
+        </div>
+        
+        <div class="glass-panel" style="grid-column: span 2; padding: 30px; display: flex; align-items: center; justify-content: space-between; gap: 20px;">
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+                <div style="font-weight: 600; font-size: 1.1rem; color: var(--text-secondary);">Financial Analytics</div>
+                <div style="font-size: 0.9rem; color: var(--text-muted);">Explainable predictions with feature contribution.</div>
+            </div>
+            <div style="display: flex; gap: 10px; font-size: 1.8rem; color: var(--primary);">
+                <i class="fas fa-chart-line"></i>
+                <i class="fas fa-chart-pie"></i>
+                <i class="fas fa-chart-bar"></i>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section class="features-section">
+    <h2 class="section-title">How FinCheck Works</h2>
+    <p class="section-subtitle">A state-of-the-art fintech credit solution that puts powerful predictive analytics in the hands of users and financial institutions.</p>
+    
+    <div class="feature-grid">
+        <!-- Feature 1 -->
+        <div class="glass-panel feature-card">
+            <div class="feature-icon">
+                <i class="fas fa-brain"></i>
+            </div>
+            <h3>AI Eligibility Engine</h3>
+            <p>Our Random Forest Classifier uses multiple financial criteria to calculate the exact probability of loan approval in real-time.</p>
+        </div>
+        
+        <!-- Feature 2 -->
+        <div class="glass-panel feature-card">
+            <div class="feature-icon">
+                <i class="fas fa-file-shield"></i>
+            </div>
+            <h3>Explainable AI (XAI)</h3>
+            <p>We don't just output a number. FinCheck explains exactly why a prediction was made, showing negative and positive factors.</p>
+        </div>
+        
+        <!-- Feature 3 -->
+        <div class="glass-panel feature-card">
+            <div class="feature-icon">
+                <i class="fas fa-user-tie"></i>
+            </div>
+            <h3>Institution Portal</h3>
+            <p>A comprehensive admin workspace where lenders can search, filter, override statuses, and audit approval statistics.</p>
+        </div>
+    </div>
+</section>
+{% endblock %}
