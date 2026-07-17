@@ -2,6 +2,10 @@ import os
 import io
 import json
 import sqlite3
+import secrets
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from functools import wraps
 from datetime import datetime, timedelta
 import random
@@ -11,6 +15,92 @@ import joblib
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
+
+# Load .env file if it exists
+def load_env_file():
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+    if os.path.exists(env_path):
+        with open(env_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    if '=' in line:
+                        key, val = line.split('=', 1)
+                        val = val.strip()
+                        if (val.startswith('"') and val.endswith('"')) or (val.startswith("'") and val.endswith("'")):
+                            val = val[1:-1]
+                        os.environ[key.strip()] = val.strip()
+
+load_env_file()
+
+def generate_6_digit_otp():
+    return str(secrets.randbelow(900000) + 100000)
+
+def send_otp_email(to_email, otp):
+    # Dynamically load env on each email send to pick up new credentials without restart
+    load_env_file()
+    
+    email_user = os.environ.get('EMAIL_USER')
+    email_pass = os.environ.get('EMAIL_PASS')
+    if email_pass:
+        email_pass = email_pass.replace(" ", "").strip()
+        
+    # Always print OTP to the console for easy debugging/testing
+    print("\n" + "*" * 60, flush=True)
+    print(f"[OTP SECURITY CODE] Sent To: {to_email}", flush=True)
+    print(f"[OTP Code]: {otp}", flush=True)
+    print("*" * 60 + "\n", flush=True)
+    
+    # If using seeded test accounts (e.g. user@fincheck.com), route OTP to the configured EMAIL_USER
+    target_email = to_email
+    if to_email.lower().endswith('@fincheck.com') and email_user:
+        target_email = email_user
+        print(f"[INFO] Redirected test account OTP from {to_email} to configured developer email {email_user}", flush=True)
+    
+    if not email_user or not email_pass:
+        print("\n" + "="*50, flush=True)
+        print("WARNING: EMAIL_USER and/or EMAIL_PASS environment variables are not set!", flush=True)
+        print("SIMULATING EMAIL SEND IN CONSOLE ONLY.", flush=True)
+        print(f"To: {target_email}")
+        print(f"Subject: FinCheck AI - Login Verification Code")
+        print(f"OTP Code: {otp}")
+        print("="*50 + "\n")
+        return True
+        
+    try:
+        from email.utils import formatdate, make_msgid
+        msg = MIMEMultipart()
+        msg['From'] = email_user
+        msg['To'] = target_email
+        msg['Subject'] = f"FinCheck Verification Code: {otp}"
+        msg['Date'] = formatdate(localtime=True)
+        msg['Message-ID'] = make_msgid()
+        
+        body = f"""Hello,
+ 
+Your FinCheck AI login verification code is: {otp}
+ 
+This code is valid for 5 minutes. Please enter this code on the verification screen to complete your login.
+ 
+If you did not request this code, please secure your account.
+ 
+Best regards,
+FinCheck Security Team"""
+        msg.attach(MIMEText(body, 'plain'))
+        
+        server = smtplib.SMTP('smtp.gmail.com', 587, timeout=10)
+        server.starttls()
+        server.login(email_user, email_pass)
+        server.sendmail(email_user, [target_email], msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        import traceback
+        print("\n" + "="*50)
+        print(f"ERROR: Email delivery failed: {e}")
+        traceback.print_exc()
+        print("="*50 + "\n")
+        raise e
 
 # ReportLab imports for PDF generation
 from reportlab.lib.pagesizes import letter
@@ -77,6 +167,40 @@ def calculate_emi(amount, rate_annual, tenure_months):
         return amount / tenure_months
     return (amount * r * (1 + r)**tenure_months) / ((1 + r)**tenure_months - 1)
 
+def recommend_loan_parameters(monthly_income, existing_emi, requested_amount):
+    safe_emi = (monthly_income * 0.35) - existing_emi
+    if safe_emi < 2000:
+        safe_emi = max(2000, monthly_income * 0.20)
+        
+    r = 0.105 / 12.0
+    n = 36 # 3 years
+    
+    # Reverse EMI: P = EMI / [ r * (1+r)^N / ((1+r)^N - 1) ]
+    factor = (r * (1 + r)**n) / (((1 + r)**n) - 1)
+    safe_amount = safe_emi / factor
+    
+    recommended_amount = min(requested_amount, safe_amount)
+    recommended_amount = max(10000, round(recommended_amount / 5000) * 5000)
+    
+    recommended_emi = calculate_emi(recommended_amount, 10.5, n)
+    
+    # Financial Health Score: depends on existing obligations
+    dti_base = existing_emi / max(1, monthly_income)
+    health_score = int(100 - (dti_base * 100))
+    health_score = min(100, max(15, health_score))
+    
+    # Approval Probability
+    prob = min(99, max(10, int((1 - dti_base) * 95)))
+    
+    return {
+        'recommended_amount': recommended_amount,
+        'recommended_emi': recommended_emi,
+        'recommended_duration': n,
+        'suggested_interest_range': '9.5% - 11.5%',
+        'financial_health_score': health_score,
+        'approval_probability': prob
+    }
+
 # Trust Score Rating System Helpers
 def compute_trust_score(user_id):
     score = 30
@@ -88,11 +212,15 @@ def compute_trust_score(user_id):
     verified_types = [row['document_type'] for row in cursor.fetchall()]
     
     if 'pan_verification' in verified_types:
-        score += 30
+        score += 15
+    if 'aadhaar_verification' in verified_types:
+        score += 15
     if 'bank_statement' in verified_types:
-        score += 20
-    if 'identity_proof' in verified_types:
-        score += 20
+        score += 15
+    if 'salary_slip' in verified_types:
+        score += 15
+    if 'business_registration' in verified_types:
+        score += 10
         
     # Add applicant history bonus
     cursor.execute("SELECT credit_history FROM applications WHERE user_id = ? ORDER BY created_at DESC LIMIT 1", (user_id,))
@@ -113,6 +241,79 @@ def get_trust_level(score):
     else:
         return 'Bronze', '#64748B' # Gray
 
+def trigger_matching_engine(app_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # 1. Fetch application details
+    cursor.execute("SELECT * FROM applications WHERE id = ?", (app_id,))
+    app_row = cursor.fetchone()
+    if not app_row:
+        conn.close()
+        return
+        
+    user_id = app_row['user_id']
+    loan_amount = app_row['loan_amount']
+    loan_tenure = app_row['loan_tenure']
+    
+    # Get applicant's trust score
+    trust_score = compute_trust_score(user_id)
+    
+    # 2. Find all active lenders
+    cursor.execute("""
+        SELECT u.id, lp.max_lending_amount, lp.min_trust_score, lp.interest_rate, lp.preferred_location, lp.preferred_duration 
+        FROM users u 
+        JOIN lender_preferences lp ON u.id = lp.user_id 
+        WHERE u.role = 'lender'
+    """)
+    lenders = cursor.fetchall()
+    
+    for lender in lenders:
+        lender_id = lender['id']
+        max_amount = lender['max_lending_amount']
+        min_score = lender['min_trust_score']
+        pref_dur = lender['preferred_duration']
+        pref_loc = lender['preferred_location']
+        
+        # Calculate compatibility
+        score = 50
+        reasons = []
+        
+        if trust_score >= min_score:
+            score += 15
+            reasons.append("✓ Trust Score Meets Requirement")
+        else:
+            reasons.append("✗ Trust Score Below Target")
+            
+        if loan_amount <= max_amount:
+            score += 15
+            reasons.append("✓ Loan Amount Compatible")
+        else:
+            reasons.append("✗ Loan Amount Exceeds Preferred Limit")
+            
+        if loan_tenure <= pref_dur:
+            score += 10
+            reasons.append("✓ Preferred Duration Matches")
+        else:
+            reasons.append("✗ Loan Duration Longer Than Desired")
+            
+        if pref_loc == 'All' or pref_loc.lower() == 'mumbai' or pref_loc.lower() in app_row['full_name'].lower():
+            score += 10
+            reasons.append("✓ Same Location")
+        else:
+            reasons.append("✓ Location Acceptable")
+            
+        # Ensure we don't duplicate matches
+        cursor.execute("SELECT id FROM matches WHERE lender_id = ? AND application_id = ?", (lender_id, app_id))
+        if not cursor.fetchone():
+            cursor.execute('''
+                INSERT INTO matches (lender_id, application_id, compatibility_score, reasons)
+                VALUES (?, ?, ?, ?)
+            ''', (lender_id, app_id, min(100, score), json.dumps(reasons)))
+            
+    conn.commit()
+    conn.close()
+
 
 # --- Routes ---
 
@@ -129,6 +330,8 @@ def login_route():
     if 'user_id' in session:
         if session.get('role') == 'admin':
             return redirect(url_for('admin_dashboard'))
+        elif session.get('role') == 'lender':
+            return redirect(url_for('lender_dashboard'))
         return redirect(url_for('applicant_dashboard'))
         
     if request.method == 'POST':
@@ -142,40 +345,31 @@ def login_route():
         if action == 'login':
             cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
             user = cursor.fetchone()
-            conn.close()
             
             if user and check_password_hash(user['password_hash'], password):
-                # Generate 6-digit OTP code
-                otp = f"{random.randint(100000, 999999)}"
-                expiry = (datetime.now() + timedelta(minutes=5)).strftime('%Y-%m-%d %H:%M:%S')
+                email = user['email']
+                otp = generate_6_digit_otp()
+                expires_at = (datetime.now() + timedelta(minutes=5)).strftime('%Y-%m-%d %H:%M:%S')
                 
-                # Save OTP to database
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute(
-                    "UPDATE users SET otp_code = ?, otp_expiry = ? WHERE id = ?",
-                    (otp, expiry, user['id'])
-                )
+                # Store OTP in database
+                cursor.execute("DELETE FROM otps WHERE email = ?", (email,))
+                cursor.execute("""
+                    INSERT INTO otps (email, otp, expires_at)
+                    VALUES (?, ?, ?)
+                """, (email, otp, expires_at))
                 conn.commit()
                 conn.close()
                 
-                # Staged user session identifier
-                session['pre_auth_user_id'] = user['id']
-                
-                # Print simulated OTP to console log
-                print("\n" + "="*50)
-                print(f"SIMULATED OTP DISPATCH")
-                print(f"To Username: {user['username']}")
-                print(f"Masked Email: {user['email']}")
-                print(f"Masked Phone: {user['phone']}")
-                print(f"ONE-TIME PASSCODE: {otp}")
-                print("="*50 + "\n")
-                
-                # Flash OTP code for demonstration convenience
-                flash(f"[DEMO ONLY] OTP code sent: {otp}", "info")
-                
-                return redirect(url_for('otp_verification_route'))
+                try:
+                    send_otp_email(email, otp)
+                    session['pre_auth_email'] = email
+                    flash("OTP Sent Successfully. Please verify your identity.", "success")
+                    return redirect(url_for('verify_otp_route'))
+                except Exception as e:
+                    flash(f"Unable to send OTP. Error: {e}", "error")
+                    return render_template('login.html')
             else:
+                conn.close()
                 flash("Invalid username or password.", "error")
                 return render_template('login.html')
                 
@@ -195,8 +389,14 @@ def login_route():
                     "INSERT INTO users (username, password_hash, email, phone, role) VALUES (?, ?, ?, ?, ?)",
                     (username, hashed_pass, email, phone, role)
                 )
+                user_id = cursor.lastrowid
+                if role == 'lender':
+                    cursor.execute(
+                        "INSERT INTO lender_preferences (user_id) VALUES (?)",
+                        (user_id,)
+                    )
                 conn.commit()
-                flash("Registration successful! Please log in to verify your account using OTP.", "success")
+                flash("Registration successful! Please log in to access your account.", "success")
                 return redirect(url_for('login_route'))
             except sqlite3.IntegrityError:
                 flash("Username, Email, or Phone already registered.", "error")
@@ -205,137 +405,200 @@ def login_route():
                 
     return render_template('login.html')
 
+@app.route('/verify-otp', methods=['GET'])
+def verify_otp_route():
+    if 'user_id' in session:
+        if session.get('role') == 'admin':
+            return redirect(url_for('admin_dashboard'))
+        elif session.get('role') == 'lender':
+            return redirect(url_for('lender_dashboard'))
+        return redirect(url_for('applicant_dashboard'))
+        
+    if 'pre_auth_email' not in session:
+        flash("Please log in first.", "error")
+        return redirect(url_for('login_route'))
+        
+    return render_template('verify_otp.html', email=session['pre_auth_email'])
+
+
+@app.route('/api/auth/send-otp', methods=['POST'])
+def api_send_otp():
+    data = request.get_json() or {}
+    email = data.get('email', '').strip()
+    
+    if not email:
+        return jsonify({'success': False, 'error': 'Email is required'}), 400
+        
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
+    user = cursor.fetchone()
+    
+    if not user:
+        conn.close()
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+        
+    otp = generate_6_digit_otp()
+    expires_at = (datetime.now() + timedelta(minutes=5)).strftime('%Y-%m-%d %H:%M:%S')
+    
+    cursor.execute("DELETE FROM otps WHERE email = ?", (email,))
+    cursor.execute("""
+        INSERT INTO otps (email, otp, expires_at)
+        VALUES (?, ?, ?)
+    """, (email, otp, expires_at))
+    conn.commit()
+    conn.close()
+    
+    try:
+        send_otp_email(email, otp)
+        return jsonify({'success': True, 'message': 'OTP Sent Successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f"Unable to send OTP: {e}"}), 500
+
+
+@app.route('/api/auth/verify-otp', methods=['POST'])
+def api_verify_otp():
+    if request.is_json:
+        data = request.get_json() or {}
+        email = data.get('email', '').strip()
+        otp = data.get('otp', '').strip()
+    else:
+        email = request.form.get('email', '').strip()
+        otp = request.form.get('otp', '').strip()
+        
+    if not email or not otp:
+        if request.is_json:
+            return jsonify({'success': False, 'error': 'Email and OTP are required'}), 400
+        flash("Email and OTP are required.", "error")
+        return redirect(url_for('verify_otp_route'))
+        
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM otps WHERE email = ?", (email,))
+    otp_record = cursor.fetchone()
+    
+    if not otp_record:
+        conn.close()
+        if request.is_json:
+            return jsonify({'success': False, 'error': 'Invalid OTP'}), 400
+        flash("Invalid OTP.", "error")
+        return redirect(url_for('verify_otp_route'))
+        
+    expires_at_str = otp_record['expires_at']
+    try:
+        expires_at = datetime.strptime(expires_at_str, '%Y-%m-%d %H:%M:%S')
+    except ValueError:
+        expires_at = datetime.now()
+        
+    if expires_at < datetime.now():
+        cursor.execute("DELETE FROM otps WHERE email = ?", (email,))
+        conn.commit()
+        conn.close()
+        if request.is_json:
+            return jsonify({'success': False, 'error': 'OTP has expired'}), 400
+        flash("OTP has expired.", "error")
+        return redirect(url_for('verify_otp_route'))
+        
+    if otp_record['otp'] != otp:
+        conn.close()
+        if request.is_json:
+            return jsonify({'success': False, 'error': 'Invalid OTP'}), 400
+        flash("Invalid OTP.", "error")
+        return redirect(url_for('verify_otp_route'))
+        
+    cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
+    user = cursor.fetchone()
+    
+    if not user:
+        conn.close()
+        if request.is_json:
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+        flash("User not found.", "error")
+        return redirect(url_for('login_route'))
+        
+    cursor.execute("DELETE FROM otps WHERE email = ?", (email,))
+    conn.commit()
+    conn.close()
+    
+    session['user_id'] = user['id']
+    session['username'] = user['username']
+    session['role'] = user['role']
+    if 'pre_auth_email' in session:
+        session.pop('pre_auth_email')
+        
+    flash(f"Welcome back, {user['username']}! Logged in successfully.", "success")
+    
+    simulated_jwt = f"simulated_jwt_token_for_{user['username']}_expires_in_1h"
+    
+    if request.is_json:
+        return jsonify({
+            'success': True,
+            'token': simulated_jwt,
+            'user': {
+                'id': user['id'],
+                'username': user['username'],
+                'email': user['email'],
+                'role': user['role']
+            }
+        })
+        
+    if user['role'] == 'admin':
+        return redirect(url_for('admin_dashboard'))
+    elif user['role'] == 'lender':
+        return redirect(url_for('lender_dashboard'))
+    return redirect(url_for('applicant_dashboard'))
+
+
+@app.route('/api/auth/resend-otp', methods=['POST'])
+def api_resend_otp():
+    if request.is_json:
+        data = request.get_json() or {}
+        email = data.get('email', '').strip()
+    else:
+        email = request.form.get('email', '').strip()
+        
+    if not email:
+        return jsonify({'success': False, 'error': 'Email is required'}), 400
+        
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
+    user = cursor.fetchone()
+    
+    if not user:
+        conn.close()
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+        
+    cursor.execute("DELETE FROM otps WHERE email = ?", (email,))
+    
+    otp = generate_6_digit_otp()
+    expires_at = (datetime.now() + timedelta(minutes=5)).strftime('%Y-%m-%d %H:%M:%S')
+    
+    cursor.execute("""
+        INSERT INTO otps (email, otp, expires_at)
+        VALUES (?, ?, ?)
+    """, (email, otp, expires_at))
+    conn.commit()
+    conn.close()
+    
+    try:
+        send_otp_email(email, otp)
+        if request.is_json:
+            return jsonify({'success': True, 'message': 'OTP Sent Successfully'})
+        flash("OTP resent successfully.", "success")
+        return redirect(url_for('verify_otp_route'))
+    except Exception as e:
+        if request.is_json:
+            return jsonify({'success': False, 'error': f"Unable to send OTP: {e}"}), 500
+        flash(f"Unable to send OTP. Error: {e}", "error")
+        return redirect(url_for('verify_otp_route'))
+
+
 @app.route('/logout')
 def logout_route():
     session.clear()
     flash("Successfully logged out.", "success")
     return redirect(url_for('landing'))
-
-# --- Two-Step OTP Verification Helpers & Routes ---
-
-def mask_email(email):
-    if not email or '@' not in email:
-        return email
-    parts = email.split('@')
-    name = parts[0]
-    domain = parts[1]
-    if len(name) <= 2:
-        masked_name = name[0] + '*'
-    else:
-        masked_name = name[0] + '*' * (len(name) - 2) + name[-1]
-    return f"{masked_name}@{domain}"
-
-def mask_phone(phone):
-    if not phone:
-        return "Not Provided"
-    if len(phone) <= 4:
-        return "****"
-    return "*" * (len(phone) - 4) + phone[-4:]
-
-@app.route('/login/otp', methods=['GET', 'POST'])
-def otp_verification_route():
-    if 'user_id' in session:
-        if session.get('role') == 'admin':
-            return redirect(url_for('admin_dashboard'))
-        return redirect(url_for('applicant_dashboard'))
-        
-    pre_auth_id = session.get('pre_auth_user_id')
-    if not pre_auth_id:
-        flash("Please log in first.", "error")
-        return redirect(url_for('login_route'))
-        
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE id = ?", (pre_auth_id,))
-    user = cursor.fetchone()
-    conn.close()
-    
-    if not user:
-        flash("User record not found.", "error")
-        return redirect(url_for('login_route'))
-        
-    if request.method == 'POST':
-        entered_otp = request.form.get('otp', '').strip()
-        
-        # Check expiry
-        now = datetime.now()
-        expiry_dt = None
-        if user['otp_expiry']:
-            try:
-                expiry_dt = datetime.strptime(user['otp_expiry'], '%Y-%m-%d %H:%M:%S')
-            except ValueError:
-                pass
-                
-        if not expiry_dt or now > expiry_dt:
-            flash("Verification code has expired. Please request a new one.", "error")
-            return render_template('otp.html', email_masked=mask_email(user['email']), phone_masked=mask_phone(user['phone']))
-            
-        if entered_otp == user['otp_code']:
-            # Clear OTP in database
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("UPDATE users SET otp_code = NULL, otp_expiry = NULL WHERE id = ?", (user['id'],))
-            conn.commit()
-            conn.close()
-            
-            # Elevate to active session
-            session.pop('pre_auth_user_id', None)
-            session['user_id'] = user['id']
-            session['username'] = user['username']
-            session['role'] = user['role']
-            
-            flash(f"Welcome, {user['username']}! Verification successful.", "success")
-            if user['role'] == 'admin':
-                return redirect(url_for('admin_dashboard'))
-            return redirect(url_for('applicant_dashboard'))
-        else:
-            flash("Incorrect verification code.", "error")
-            
-    # Mask details for display
-    email_masked = mask_email(user['email'])
-    phone_masked = mask_phone(user['phone'])
-    
-    return render_template('otp.html', email_masked=email_masked, phone_masked=phone_masked)
-
-@app.route('/login/otp/resend', methods=['POST'])
-def otp_resend_route():
-    pre_auth_id = session.get('pre_auth_user_id')
-    if not pre_auth_id:
-        flash("Please log in first.", "error")
-        return redirect(url_for('login_route'))
-        
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE id = ?", (pre_auth_id,))
-    user = cursor.fetchone()
-    
-    if not user:
-        conn.close()
-        flash("User record not found.", "error")
-        return redirect(url_for('login_route'))
-        
-    # Generate a new 6-digit OTP code
-    otp = f"{random.randint(100000, 999999)}"
-    expiry = (datetime.now() + timedelta(minutes=5)).strftime('%Y-%m-%d %H:%M:%S')
-    
-    cursor.execute(
-        "UPDATE users SET otp_code = ?, otp_expiry = ? WHERE id = ?",
-        (otp, expiry, user['id'])
-    )
-    conn.commit()
-    conn.close()
-    
-    # Print simulated OTP to console log
-    print("\n" + "="*50)
-    print(f"RESENT SIMULATED OTP DISPATCH")
-    print(f"To Username: {user['username']}")
-    print(f"Masked Email: {user['email']}")
-    print(f"Masked Phone: {user['phone']}")
-    print(f"ONE-TIME PASSCODE: {otp}")
-    print("="*50 + "\n")
-    
-    flash(f"[DEMO ONLY] New OTP code sent: {otp}", "info")
-    return redirect(url_for('otp_verification_route'))
 
 # --- Applicant Flow ---
 
@@ -349,6 +612,28 @@ def applicant_dashboard():
         (session['user_id'],)
     )
     apps = cursor.fetchall()
+    
+    # Fetch matched lenders
+    cursor.execute("""
+        SELECT m.id as match_id, m.compatibility_score, m.reasons, m.lender_status, m.borrower_status,
+               u.id as lender_user_id, u.username as lender_name, u.email as lender_email, u.phone as lender_phone,
+               lp.interest_rate
+        FROM matches m
+        JOIN applications a ON m.application_id = a.id
+        JOIN users u ON m.lender_id = u.id
+        JOIN lender_preferences lp ON u.id = lp.user_id
+        WHERE a.user_id = ?
+        ORDER BY m.compatibility_score DESC
+    """, (session['user_id'],))
+    matches_rows = cursor.fetchall()
+    
+    matches = []
+    for r in matches_rows:
+        md = dict(r)
+        md['reasons'] = json.loads(r['reasons'])
+        md['lender_trust_score'] = compute_trust_score(r['lender_user_id'])
+        matches.append(md)
+        
     conn.close()
     
     score = compute_trust_score(session['user_id'])
@@ -358,7 +643,8 @@ def applicant_dashboard():
         'dashboard_applicant.html', 
         apps=apps, 
         trust_score=score, 
-        trust_level=level
+        trust_level=level,
+        matches=matches
     )
 
 @app.route('/apply', methods=['GET', 'POST'])
@@ -519,6 +805,9 @@ def apply():
         conn.commit()
         conn.close()
         
+        # Trigger matching with active lenders
+        trigger_matching_engine(new_app_id)
+        
         # 3. Simulate Email Notification
         print("\n" + "="*50)
         print(f"SIMULATED EMAIL NOTIFICATION SENT TO {email}")
@@ -589,6 +878,8 @@ def result(app_id):
     trust_score = compute_trust_score(app_row['user_id'])
     trust_level, trust_color = get_trust_level(trust_score)
     
+    recommendation_params = recommend_loan_parameters(app_row['monthly_income'], app_row['existing_emi'], app_row['loan_amount'])
+    
     return render_template(
         'result.html', 
         app=app_row, 
@@ -599,8 +890,163 @@ def result(app_id):
         docs=docs,
         trust_score=trust_score,
         trust_level=trust_level,
-        trust_color=trust_color
+        trust_color=trust_color,
+        recommendation_params=recommendation_params
     )
+
+# --- Lender Flow ---
+
+@app.route('/lender/dashboard')
+@login_required('lender')
+def lender_dashboard():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Get lender preferences
+    cursor.execute("SELECT * FROM lender_preferences WHERE user_id = ?", (session['user_id'],))
+    prefs = cursor.fetchone()
+    if not prefs:
+        # Create default preferences
+        cursor.execute("INSERT INTO lender_preferences (user_id) VALUES (?)", (session['user_id'],))
+        conn.commit()
+        cursor.execute("SELECT * FROM lender_preferences WHERE user_id = ?", (session['user_id'],))
+        prefs = cursor.fetchone()
+        
+    # Get active/pending matches
+    cursor.execute("""
+        SELECT m.id as match_id, m.compatibility_score, m.reasons, m.lender_status, m.borrower_status,
+               a.id as app_id, a.full_name, a.loan_amount, a.loan_tenure, a.loan_type, a.monthly_income,
+               u.id as borrower_id, u.email as borrower_email, u.phone as borrower_phone
+        FROM matches m
+        JOIN applications a ON m.application_id = a.id
+        JOIN users u ON a.user_id = u.id
+        WHERE m.lender_id = ?
+        ORDER BY m.compatibility_score DESC
+    """, (session['user_id'],))
+    matches_rows = cursor.fetchall()
+    
+    # Calculate some dashboard stats
+    cursor.execute("SELECT COUNT(*) FROM applications WHERE status = 'Pending' OR status = 'Approved' OR status = 'Moderate'")
+    available_borrowers = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM matches WHERE lender_id = ? AND lender_status = 'Pending'", (session['user_id'],))
+    pending_requests = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM matches WHERE lender_id = ? AND lender_status = 'Accepted' AND borrower_status = 'Accepted'", (session['user_id'],))
+    today_matches = cursor.fetchone()[0]
+    
+    # Get average borrower trust score
+    cursor.execute("SELECT user_id FROM applications")
+    borrower_ids = [row['user_id'] for row in cursor.fetchall()]
+    avg_trust = 0
+    if borrower_ids:
+        scores = [compute_trust_score(b_id) for b_id in set(borrower_ids)]
+        avg_trust = sum(scores) // len(scores) if scores else 0
+    else:
+        avg_trust = 75 # placeholder default
+        
+    # Convert matches rows to lists for template access
+    matches = []
+    for r in matches_rows:
+        md = dict(r)
+        md['reasons'] = json.loads(r['reasons'])
+        md['trust_score'] = compute_trust_score(r['borrower_id'])
+        matches.append(md)
+        
+    score = compute_trust_score(session['user_id'])
+    level, _ = get_trust_level(score)
+    
+    conn.close()
+    return render_template(
+        'dashboard_lender.html',
+        prefs=dict(prefs),
+        matches=matches,
+        available_borrowers=available_borrowers,
+        pending_requests=pending_requests,
+        today_matches=today_matches,
+        avg_trust=avg_trust,
+        trust_score=score,
+        trust_level=level
+    )
+
+@app.route('/api/lender/preferences/save', methods=['POST'])
+@login_required('lender')
+def save_lender_preferences():
+    max_amount = float(request.form.get('max_lending_amount', 2000000.0))
+    min_score = int(request.form.get('min_trust_score', 60))
+    rate = float(request.form.get('interest_rate', 10.5))
+    pref_loc = request.form.get('preferred_location', 'All').strip()
+    pref_dur = int(request.form.get('preferred_duration', 24))
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE lender_preferences
+        SET max_lending_amount = ?, min_trust_score = ?, interest_rate = ?, preferred_location = ?, preferred_duration = ?
+        WHERE user_id = ?
+    """, (max_amount, min_score, rate, pref_loc, pref_dur, session['user_id']))
+    conn.commit()
+    
+    # Re-run matching engine for all active applications
+    cursor.execute("SELECT id FROM applications")
+    apps = cursor.fetchall()
+    for app in apps:
+        trigger_matching_engine(app['id'])
+        
+    conn.close()
+    flash("Lending preferences updated and match recommendations refreshed!", "success")
+    return redirect(url_for('lender_dashboard'))
+
+@app.route('/api/matches/<int:match_id>/action', methods=['POST'])
+@login_required()
+def match_action(match_id):
+    action = request.form.get('action') # 'Accepted' or 'Rejected'
+    if action not in ['Accepted', 'Rejected']:
+        return jsonify({'success': False, 'error': 'Invalid action'}), 400
+        
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT * FROM matches WHERE id = ?", (match_id,))
+    match_row = cursor.fetchone()
+    if not match_row:
+        conn.close()
+        return jsonify({'success': False, 'error': 'Match record not found'}), 404
+        
+    role = session.get('role')
+    if role == 'lender':
+        # Verify ownership
+        if match_row['lender_id'] != session['user_id']:
+            conn.close()
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+        cursor.execute("UPDATE matches SET lender_status = ? WHERE id = ?", (action, match_id))
+    else:
+        # Check borrower owns the application
+        cursor.execute("SELECT user_id FROM applications WHERE id = ?", (match_row['application_id'],))
+        app_row = cursor.fetchone()
+        if not app_row or app_row['user_id'] != session['user_id']:
+            conn.close()
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+        cursor.execute("UPDATE matches SET borrower_status = ? WHERE id = ?", (action, match_id))
+        
+    conn.commit()
+    
+    # Check if both accepted
+    cursor.execute("SELECT lender_status, borrower_status FROM matches WHERE id = ?", (match_id,))
+    updated_match = cursor.fetchone()
+    conn.close()
+    
+    both_accepted = (updated_match['lender_status'] == 'Accepted' and updated_match['borrower_status'] == 'Accepted')
+    
+    msg = f"Match {action.lower()} successfully."
+    if both_accepted:
+        msg = "Match finalized! Peer-to-peer contact details have been successfully unlocked."
+        
+    flash(msg, "success")
+    if role == 'lender':
+        return redirect(url_for('lender_dashboard'))
+    else:
+        return redirect(url_for('applicant_dashboard'))
 
 # --- Lender/Admin Flow ---
 
@@ -895,9 +1341,28 @@ def api_applications_pdf(app_id):
     if not rec_found:
         story.append(Paragraph("• Your application demonstrates excellent creditworthiness. Maintain current savings levels.", bullet_style))
         
-    story.append(Spacer(1, 30))
-    story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#E2E8F0'), spaceAfter=15))
-    story.append(Paragraph("<i>Disclaimer: This report represents automated AI underwriting prediction and does not constitute a binding legal credit agreement.</i>", ParagraphStyle('Discl', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#94A3B8'))))
+    story.append(Spacer(1, 10))
+    
+    # Append structured AI parameters
+    story.append(Paragraph("4. AI Recommended Financing Structure", section_style))
+    rec = recommend_loan_parameters(app_row['monthly_income'], app_row['existing_emi'], app_row['loan_amount'])
+    story.append(Paragraph(f"• <b>Recommended Principal Limit:</b> Rs. {rec['recommended_amount']:,.2f}", bullet_style))
+    story.append(Paragraph(f"• <b>Recommended Monthly EMI:</b> Rs. {rec['recommended_emi']:,.2f} at suggested tenure of {rec['recommended_duration']} months", bullet_style))
+    story.append(Paragraph(f"• <b>Suggested Interest Range:</b> {rec['suggested_interest_range']}", bullet_style))
+    story.append(Paragraph(f"• <b>Financial Health Score:</b> {rec['financial_health_score']}/100 &nbsp;&nbsp;|&nbsp;&nbsp; <b>Approval Probability:</b> {rec['approval_probability']}%", bullet_style))
+    
+    story.append(Spacer(1, 15))
+    
+    # Append official compliance disclaimer
+    story.append(Paragraph("5. Compliance & Platform AI Disclaimer", section_style))
+    story.append(Paragraph(
+        "This recommendation is generated by AI based on user-provided information. Final lending decisions remain entirely between lenders and borrowers. FinCheck AI is not a financial institution and is not responsible for any financial transactions or disputes.",
+        ParagraphStyle('DisclCommercial', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#64748B'), fontName='Helvetica-Oblique')
+    ))
+    
+    story.append(Spacer(1, 15))
+    story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#E2E8F0'), spaceAfter=10))
+    story.append(Paragraph("<i>Disclaimer: This report represents automated AI underwriting prediction and does not constitute a binding legal credit agreement.</i>", ParagraphStyle('Discl', parent=styles['Normal'], fontSize=7.5, textColor=colors.HexColor('#94A3B8'))))
     
     # Build Document
     doc.build(story)
@@ -910,15 +1375,329 @@ def api_applications_pdf(app_id):
         mimetype='application/pdf'
     )
 
+import urllib.request
+import json
+
+def get_gemini_response(api_key, prompt, context_data=None):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={api_key}"
+    
+    system_instr = (
+        "You are FinCheck's AI Assistant, a friendly and professional financial advisor helping users on a "
+        "Peer-to-Peer (P2P) lending and machine-learning trust scoring platform. "
+        "Answer the user's question clearly and concisely in a conversational style. Keep responses short and helpful (max 3-4 sentences)."
+    )
+    
+    full_prompt = f"System Instruction: {system_instr}\n\n"
+    if context_data:
+        full_prompt += f"Logged-in User Context:\n{json.dumps(context_data, indent=2)}\n\n"
+    full_prompt += f"User Question: {prompt}"
+    
+    data = {
+        "contents": [{
+            "parts": [{"text": full_prompt}]
+        }],
+        "generationConfig": {
+            "temperature": 0.7,
+            "maxOutputTokens": 250
+        }
+    }
+    
+    try:
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(data).encode('utf-8'),
+            headers={'Content-Type': 'application/json'},
+            method='POST'
+        )
+        with urllib.request.urlopen(req, timeout=8) as response:
+            res_data = json.loads(response.read().decode('utf-8'))
+            return res_data['candidates'][0]['content']['parts'][0]['text'].strip()
+    except Exception as e:
+        print(f"Gemini API Exception: {e}")
+        return None
+
+
+def verify_document_with_gemini(api_key, file_path, doc_type):
+    import base64
+    import mimetypes
+    import os
+    
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={api_key}"
+    
+    # Read file content and base64 encode it
+    try:
+        with open(file_path, "rb") as f:
+            file_data = f.read()
+            base64_data = base64.b64encode(file_data).decode("utf-8")
+    except Exception as e:
+        print(f"Error reading file for Gemini verification: {e}", flush=True)
+        return None
+
+    # Determine MIME type
+    mime_type, _ = mimetypes.guess_type(file_path)
+    if not mime_type:
+        # Fallback MIME types based on file extension
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext in ['.jpg', '.jpeg']:
+            mime_type = 'image/jpeg'
+        elif ext == '.png':
+            mime_type = 'image/png'
+        elif ext == '.pdf':
+            mime_type = 'application/pdf'
+        else:
+            mime_type = 'application/octet-stream'
+
+    prompt = (
+        f"You are an automated document verification system. "
+        f"Analyze the attached document and determine if it is a valid document of category: '{doc_type}'. "
+        f"The valid categories and their meanings are:\n"
+        f"- pan_verification: Permanent Account Number (PAN Card) of India.\n"
+        f"- aadhaar_verification: Aadhaar Card of India (front, back, or both).\n"
+        f"- bank_statement: A Bank Statement or passbook page.\n"
+        f"- salary_slip: A Salary Slip / payslip from an employer.\n"
+        f"- business_registration: GST registration certificate, Trade License, or corporate registration certificate.\n\n"
+        f"Instructions:\n"
+        f"1. Perform OCR and check if the document structure, text, and labels match a genuine document of type '{doc_type}'.\n"
+        f"2. If it is blank, completely blurred, unrelated (like a cat, a landscape, or a completely different document type), or contains fake/draft watermark indicators, mark it as verified: false.\n"
+        f"3. Return ONLY a valid JSON object. Do not include any markdown styling like ```json or any other text. The JSON object must have exactly two fields:\n"
+        f"   - 'verified': boolean (true or false)\n"
+        f"   - 'notes': string (a short explanation of your decision, max 12 words)\n"
+    )
+
+    data = {
+        "contents": [{
+            "parts": [
+                {"text": prompt},
+                {
+                    "inlineData": {
+                        "mimeType": mime_type,
+                        "data": base64_data
+                    }
+                }
+            ]
+        }],
+        "generationConfig": {
+            "temperature": 0.1,
+            "maxOutputTokens": 150,
+            "responseMimeType": "application/json"
+        }
+    }
+
+    try:
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(data).encode('utf-8'),
+            headers={'Content-Type': 'application/json'},
+            method='POST'
+        )
+        with urllib.request.urlopen(req, timeout=15) as response:
+            res_data = json.loads(response.read().decode('utf-8'))
+            text = res_data['candidates'][0]['content']['parts'][0]['text'].strip()
+            
+            # Clean markdown code blocks if model ignores responseMimeType
+            if text.startswith("```"):
+                lines = text.split("\n")
+                if lines[0].startswith("```"):
+                    lines = lines[1:]
+                if lines and lines[-1].strip() == "```":
+                    lines = lines[:-1]
+                text = "\n".join(lines).strip()
+                
+            res_json = json.loads(text)
+            print(f"[INFO] Gemini document verification result: {res_json}", flush=True)
+            return res_json
+    except Exception as e:
+        print(f"Gemini document verification API Exception: {e}", flush=True)
+        return None
+
+@app.route('/api/chatbot', methods=['POST'])
+def chatbot_api():
+    data = request.get_json() or {}
+    message_raw = data.get('message', '').strip()
+    message = message_raw.lower()
+    
+    if not session.get('user_id'):
+        return jsonify({
+            'response': "Hello! Please log in so that I can analyze your specific financial records and assist you with your P2P applications."
+        })
+        
+    user_id = session['user_id']
+    role = session['role']
+    username = session.get('username', 'User')
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Get latest application
+    cursor.execute("SELECT * FROM applications WHERE user_id = ? ORDER BY created_at DESC LIMIT 1", (user_id,))
+    latest_app = cursor.fetchone()
+    
+    # Get verified documents list
+    cursor.execute("SELECT document_type FROM vendor_documents WHERE user_id = ? AND status = 'Verified'", (user_id,))
+    verified_docs = [row['document_type'] for row in cursor.fetchall()]
+    
+    # Pre-calculate trust score & level
+    score = compute_trust_score(user_id)
+    level, _ = get_trust_level(score)
+    
+    conn.close()
+    
+    # Split message into words for precise word matching
+    words = message.split()
+    
+    # 1. Greetings (exact word match for short greetings to prevent sub-string matching)
+    if any(greet in words for greet in ['hi', 'hello', 'hey', 'yo', 'greetings']) or 'who are you' in message or 'what is your name' in message:
+        return jsonify({
+            'response': f"Hello {username}! I am FinCheck's AI Assistant. I can help analyze your credit evaluation, check matching results with P2P lenders, suggest optimized loan parameters, or guide you on improving your trust score. How can I assist you today?"
+        })
+        
+    # 2. EMI / Calculator (Check this before general 'calculate' keyword checks)
+    elif 'emi' in message or 'calculator' in message:
+        return jsonify({
+            'response': "Our platform features an interactive EMI Calculator. Monthly payments are calculated using: `EMI = [P x r x (1+r)^n] / [(1+r)^n - 1]`. You can access it via the 'EMI Calculator' link in the top menu bar."
+        })
+        
+    # 3. Trust Score (Why is it low / How to improve)
+    elif 'trust score' in message or 'score' in message or 'improve' in message:
+        missing = []
+        if 'pan_verification' not in verified_docs:
+            missing.append("PAN Card (+15 points)")
+        if 'aadhaar_verification' not in verified_docs:
+            missing.append("Aadhaar Card (+15 points)")
+        if 'bank_statement' not in verified_docs:
+            missing.append("Bank Statement (+15 points)")
+        if 'salary_slip' not in verified_docs:
+            missing.append("Salary Slip (+15 points)")
+        if 'business_registration' not in verified_docs:
+            missing.append("Business Registration (+10 points)")
+            
+        if not missing:
+            return jsonify({
+                'response': f"Your trust score is {score}/100 ({level} Level). All core documents are verified. Maintaining positive transaction histories and co-applying with stable guarantors can maximize your approval rates."
+            })
+        else:
+            return jsonify({
+                'response': f"Your trust score is currently {score}/100 ({level} Level). You can improve it by uploading the following documents in the 'Verify Trust' tab: {', '.join(missing)}."
+            })
+            
+    # 4. Matching / Lenders
+    elif 'match' in message or 'lender' in message:
+        if role == 'lender':
+            return jsonify({
+                'response': "Matches are determined by your lending preferences (maximum loan size, interest rate, duration, and target location). Adjusting your settings in the preferences panel will dynamically update your recommendations."
+            })
+        else:
+            if not latest_app:
+                return jsonify({
+                    'response': "You haven't submitted a loan application yet! Once you apply, the AI matching engine will match you with eligible peer-to-peer lenders based on your criteria and trust level."
+                })
+            if score < 50:
+                return jsonify({
+                    'response': "Your matches may currently be limited due to a low trust score (below 50). We highly recommend uploading your PAN, Aadhaar, and Bank Statements to unlock more lenders."
+                })
+            else:
+                return jsonify({
+                    'response': "The matching engine pairs you with lenders who support your requested loan size and whose minimum trust score criteria you meet. Check 'My Dashboard' to view active matches."
+                })
+                
+    # 5. Suggest Loan Parameters
+    elif 'suggest' in message or 'recommend' in message or 'amount' in message:
+        if not latest_app:
+            return jsonify({
+                'response': "Please submit an application or enter your income details first so I can calculate your recommended loan parameters."
+            })
+        rec = recommend_loan_parameters(latest_app['monthly_income'], latest_app['existing_emi'], latest_app['loan_amount'])
+        return jsonify({
+            'response': f"Based on your net monthly income of ₹{latest_app['monthly_income']:,.2f} and existing EMIs, the AI recommendation is a loan of ₹{rec['recommended_amount']:,.2f} for {rec['recommended_duration']} months (EMI: ₹{rec['recommended_emi']:,.2f}/mo) to ensure stable repayment."
+        })
+        
+    # 6. Missing / Upload Documents
+    elif 'document' in message or 'missing' in message or 'upload' in message or 'verify' in message:
+        all_docs = {
+            'pan_verification': 'PAN Card',
+            'aadhaar_verification': 'Aadhaar Card',
+            'bank_statement': 'Bank Statement',
+            'salary_slip': 'Salary Slip',
+            'business_registration': 'Business Registration'
+        }
+        missing = [name for key, name in all_docs.items() if key not in verified_docs]
+        if not missing:
+            return jsonify({
+                'response': "Fantastic! All requested documents have been successfully uploaded and verified by our automated document verification engine."
+            })
+        else:
+            return jsonify({
+                'response': f"The following documents are missing or pending verification: {', '.join(missing)}. Please visit the 'Verify Trust' page to upload them."
+            })
+            
+    # 7. Compatibility / Calculation vectors
+    elif 'compatibility' in message or 'calculate' in message or 'vector' in message:
+        return jsonify({
+            'response': "Compatibility is evaluated across 4 core vectors: (1) Trust Score match (2) Maximum lending limit compatibility (3) Loan duration matching, and (4) City/state location affinity."
+        })
+        
+    # 8. Application Status / Approval
+    elif any(kw in message for kw in ['status', 'approve', 'reject', 'eligible', 'application']):
+        if not latest_app:
+            return jsonify({
+                'response': "You do not have any active applications. Head over to the 'Apply for Loan' page to submit your details and get an instant AI credit evaluation!"
+            })
+        else:
+            return jsonify({
+                'response': f"Your latest application (ID: #AP-{latest_app['id']}) for a ₹{latest_app['loan_amount']:,.2f} loan is currently **{latest_app['status']}** with an AI eligibility score of {latest_app['eligibility_score']}/100 and risk level set to {latest_app['risk_level']}."
+            })
+            
+    # 9. Thank you
+    elif any(thanks in message for thanks in ['thanks', 'thank you', 'great', 'awesome', 'cool', 'perfect']):
+        return jsonify({
+            'response': "You're very welcome! I'm here to help. Let me know if you have any other questions about FinCheck AI."
+        })
+        
+    # 10. Help command
+    elif 'help' in message or 'command' in message:
+        return jsonify({
+            'response': "You can ask me questions about your profile or P2P lending, such as:\n• 'Why is my trust score low?'\n• 'What documents are missing?'\n• 'Suggest a safe loan amount'\n• 'How does lender matching work?'\n• 'How is compatibility calculated?'\n• 'What is my application status?'"
+        })
+        
+    # 11. General fallback / Gemini API call
+    import os
+    gemini_key = os.environ.get('GEMINI_API_KEY')
+    if gemini_key:
+        context_data = {
+            'username': username,
+            'role': role,
+            'trust_score': score,
+            'trust_level': level,
+            'verified_documents': verified_docs,
+            'latest_application': {
+                'id': latest_app['id'],
+                'loan_amount': latest_app['loan_amount'],
+                'loan_type': latest_app['loan_type'],
+                'status': latest_app['status'],
+                'eligibility_score': latest_app['eligibility_score'],
+                'risk_level': latest_app['risk_level'],
+                'monthly_income': latest_app['monthly_income'],
+                'existing_emi': latest_app['existing_emi']
+            } if latest_app else None
+        }
+        gemini_reply = get_gemini_response(gemini_key, message_raw, context_data)
+        if gemini_reply:
+            return jsonify({'response': gemini_reply})
+            
+    return jsonify({
+        'response': "I'm sorry, I didn't quite catch that. You can ask me: 'Why is my trust score low?', 'What documents are missing?', 'Suggest a safe loan amount', 'How is compatibility calculated?', 'What is my application status?', or simply say 'help' to see list of options."
+    })
+
 # --- Vendor Document Verification Routes ---
 
 @app.route('/applicant/verification')
-@login_required('applicant')
+@app.route('/lender/verification')
+@login_required()
 def vendor_verification_ui():
     return render_template('verification.html')
 
 @app.route('/api/vendor/upload', methods=['POST'])
-@login_required('applicant')
+@login_required()
 def vendor_upload_document():
     if 'file' not in request.files:
         return jsonify({'success': False, 'error': 'No file segment in request'}), 400
@@ -928,7 +1707,8 @@ def vendor_upload_document():
     if file.filename == '':
         return jsonify({'success': False, 'error': 'No file selected'}), 400
         
-    if not doc_type or doc_type not in ['pan_verification', 'bank_statement', 'identity_proof']:
+    valid_doc_types = ['pan_verification', 'aadhaar_verification', 'bank_statement', 'salary_slip', 'business_registration']
+    if not doc_type or doc_type not in valid_doc_types:
         return jsonify({'success': False, 'error': 'Invalid document category'}), 400
         
     if file and allowed_file(file.filename):
@@ -936,37 +1716,47 @@ def vendor_upload_document():
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(file_path)
         
-        # Simulated AI Document Verification check (OCR & Registry lookup mock)
-        status = 'Verified'
-        notes = "Automated verification successful. Format checks passed, document active in registry."
-        
-        # Check both filename and file content for fake/invalid/draft indicators
-        lower_fn = file.filename.lower()
-        is_fake = False
-        fake_keywords = ['fake', 'invalid', 'draft']
-        
-        # Check filename
-        for kw in fake_keywords:
-            if kw in lower_fn:
-                is_fake = True
-                break
-                
-        # Check file content
-        if not is_fake:
-            try:
-                with open(file_path, 'rb') as f:
-                    file_content_lower = f.read().lower()
-                for kw in fake_keywords:
-                    if kw.encode('utf-8') in file_content_lower:
-                        is_fake = True
-                        break
-            except Exception as e:
-                # If we fail to read, log the issue but proceed
-                print(f"Error reading file for validation: {e}")
-                
-        if is_fake:
-            status = 'Rejected'
-            notes = "Verification failed. System detected invalid stamp, watermarked draft copy, or fake indicators."
+        # Try real Gemini Multimodal AI document verification first
+        gemini_key = os.environ.get('GEMINI_API_KEY')
+        real_verification = None
+        if gemini_key:
+            real_verification = verify_document_with_gemini(gemini_key, file_path, doc_type)
+            
+        if real_verification is not None:
+            status = 'Verified' if real_verification.get('verified') else 'Rejected'
+            notes = real_verification.get('notes', 'AI verification complete.')
+        else:
+            # Fall back to simulated AI Document Verification check (OCR & Registry lookup mock)
+            status = 'Verified'
+            notes = "Automated verification successful. Format checks passed, document active in registry."
+            
+            # Check both filename and file content for fake/invalid/draft indicators
+            lower_fn = file.filename.lower()
+            is_fake = False
+            fake_keywords = ['fake', 'invalid', 'draft']
+            
+            # Check filename
+            for kw in fake_keywords:
+                if kw in lower_fn:
+                    is_fake = True
+                    break
+                    
+            # Check file content
+            if not is_fake:
+                try:
+                    with open(file_path, 'rb') as f:
+                        file_content_lower = f.read().lower()
+                    for kw in fake_keywords:
+                        if kw.encode('utf-8') in file_content_lower:
+                            is_fake = True
+                            break
+                except Exception as e:
+                    # If we fail to read, log the issue but proceed
+                    print(f"Error reading file for validation: {e}")
+                    
+            if is_fake:
+                status = 'Rejected'
+                notes = "Verification failed. System detected invalid stamp, watermarked draft copy, or fake indicators."
         
         # Write/Update SQLite record
         conn = get_db_connection()
@@ -1080,6 +1870,17 @@ def admin_document_action(doc_id):
         
     conn.close()
     return jsonify({'success': False, 'error': 'Invalid action'}), 400
+
+@app.route('/dev/get-otp/<email>')
+def dev_get_otp(email):
+    if not app.debug:
+        return jsonify({'error': 'Forbidden'}), 403
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT otp FROM otps WHERE email = ? ORDER BY id DESC LIMIT 1", (email,))
+    row = cursor.fetchone()
+    conn.close()
+    return jsonify({'otp': row['otp'] if row else None})
 
 if __name__ == '__main__':
     # Initialize DB tables

@@ -32,10 +32,13 @@
             <li><a href="/calculator" class="nav-link">EMI Calculator</a></li>
             {% if session.get('user_id') %}
                 {% if session.get('role') == 'admin' %}
-                    <li><a href="/admin/dashboard" class="nav-link">Lender Portal</a></li>
+                    <li><a href="/admin/dashboard" class="nav-link"><i class="fas fa-chart-pie"></i> Admin Dashboard</a></li>
+                {% elif session.get('role') == 'lender' %}
+                    <li><a href="/lender/dashboard" class="nav-link"><i class="fas fa-wallet"></i> Lender Portal</a></li>
+                    <li><a href="/lender/verification" class="nav-link"><i class="fas fa-check-double"></i> Verify Trust</a></li>
                 {% else %}
-                    <li><a href="/applicant/dashboard" class="nav-link">My Dashboard</a></li>
-                    <li><a href="/applicant/verification" class="nav-link">Verify Trust</a></li>
+                    <li><a href="/applicant/dashboard" class="nav-link"><i class="fas fa-columns"></i> Borrower Dashboard</a></li>
+                    <li><a href="/applicant/verification" class="nav-link"><i class="fas fa-check-double"></i> Verify Trust</a></li>
                 {% endif %}
             {% endif %}
         </ul>
@@ -46,6 +49,62 @@
                 <i class="fas fa-moon"></i>
             </button>
             
+            <!-- Notification Dropdown -->
+            {% if session.get('user_id') %}
+            <div class="notification-dropdown-wrap">
+                <button id="notification-bell" class="notification-btn" title="Notifications">
+                    <i class="fas fa-bell"></i>
+                    <span class="notification-badge">3</span>
+                </button>
+                <div class="notification-menu glass-panel" id="notification-menu">
+                    <div class="notification-header">
+                        <h4>Notifications</h4>
+                        <span class="mark-all-read" id="clear-notifications">Clear</span>
+                    </div>
+                    <ul class="notification-list">
+                        {% if session.get('role') == 'lender' %}
+                            <li class="notification-item unread">
+                                <i class="fas fa-user-check text-primary"></i>
+                                <div>
+                                    <p>New borrower matched for ₹2 Lakhs</p>
+                                    <small>5 mins ago</small>
+                                </div>
+                            </li>
+                            <li class="notification-item unread">
+                                <i class="fas fa-cog text-info"></i>
+                                <div>
+                                    <p>Lending preferences initialized</p>
+                                    <small>10 mins ago</small>
+                                </div>
+                            </li>
+                        {% else %}
+                            <li class="notification-item unread">
+                                <i class="fas fa-shield-heart text-success"></i>
+                                <div>
+                                    <p>Document verified: PAN Card (+15 points)</p>
+                                    <small>15 mins ago</small>
+                                </div>
+                            </li>
+                            <li class="notification-item unread">
+                                <i class="fas fa-handshake text-primary"></i>
+                                <div>
+                                    <p>New lender matched with 96% compatibility</p>
+                                    <small>1 hour ago</small>
+                                </div>
+                            </li>
+                        {% endif %}
+                        <li class="notification-item">
+                            <i class="fas fa-shield text-warning"></i>
+                            <div>
+                                <p>AI Underwriting security keys verified</p>
+                                <small>Yesterday</small>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            {% endif %}
+            
             {% if session.get('user_id') %}
                 <span class="user-greeting" style="font-size: 0.9rem; font-weight: 500; color: var(--text-secondary);">
                     Hi, <strong>{{ session.get('username') }}</strong>
@@ -55,7 +114,7 @@
                 </a>
             {% else %}
                 <a href="/login" class="btn btn-outline" style="padding: 8px 16px; font-size: 0.85rem;">Login</a>
-                <a href="/login?register=true" class="btn btn-primary" style="padding: 8px 16px; font-size: 0.85rem;">Apply Now</a>
+                <a href="/login?register=true" class="btn btn-primary" style="padding: 8px 16px; font-size: 0.85rem;">Register Now</a>
             {% endif %}
         </div>
     </nav>
@@ -73,6 +132,37 @@
         </div>
     </footer>
 
+    <!-- AI Chatbot Floating Panel -->
+    <div class="chatbot-container" id="chatbot-container">
+        <button class="chatbot-trigger" id="chatbot-trigger" title="Ask FinCheck AI">
+            <i class="fas fa-robot"></i>
+        </button>
+        <div class="chatbot-panel glass-panel" id="chatbot-panel">
+            <div class="chatbot-header">
+                <div class="chatbot-logo">
+                    <i class="fas fa-brain"></i>
+                    <span>FinCheck AI Expert</span>
+                </div>
+                <button class="chatbot-close" id="chatbot-close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="chatbot-messages" id="chatbot-messages">
+                <div class="chatbot-msg bot">
+                    Hello! I am your FinCheck AI underwriting advisor. Ask me anything about your trust score, compatibility matching, missing documents, or suggested financing.
+                </div>
+            </div>
+            <div class="chatbot-quick-questions">
+                <button class="chat-qq-btn" data-q="Why is my trust score low?">Trust Score?</button>
+                <button class="chat-qq-btn" data-q="How can I improve it?">Improve?</button>
+                <button class="chat-qq-btn" data-q="Suggest better loan amount.">Better Amount?</button>
+                <button class="chat-qq-btn" data-q="What documents are missing?">Missing Docs?</button>
+            </div>
+            <div class="chatbot-input-area">
+                <input type="text" id="chatbot-input" placeholder="Ask AI..." autocomplete="off">
+                <button id="chatbot-send-btn"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notifications Container -->
     <div id="toast-container"></div>
 
@@ -81,6 +171,117 @@
     <!-- Core JS -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     {% block scripts %}{% endblock %}
+
+    <!-- Chatbot and Notification scripts -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Chatbot toggling
+            const chatbotTrigger = document.getElementById('chatbot-trigger');
+            const chatbotPanel = document.getElementById('chatbot-panel');
+            const chatbotClose = document.getElementById('chatbot-close');
+            const chatbotInput = document.getElementById('chatbot-input');
+            const chatbotSendBtn = document.getElementById('chatbot-send-btn');
+            const chatbotMessages = document.getElementById('chatbot-messages');
+            
+            if (chatbotTrigger && chatbotPanel) {
+                chatbotTrigger.addEventListener('click', () => {
+                    chatbotPanel.classList.toggle('active');
+                });
+            }
+            
+            if (chatbotClose && chatbotPanel) {
+                chatbotClose.addEventListener('click', () => {
+                    chatbotPanel.classList.remove('active');
+                });
+            }
+            
+            // Quick Questions
+            document.querySelectorAll('.chat-qq-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const question = btn.getAttribute('data-q');
+                    sendChatbotMessage(question);
+                });
+            });
+            
+            if (chatbotSendBtn) {
+                chatbotSendBtn.addEventListener('click', () => {
+                    const msg = chatbotInput.value.trim();
+                    if (msg) {
+                        sendChatbotMessage(msg);
+                        chatbotInput.value = '';
+                    }
+                });
+            }
+            
+            if (chatbotInput) {
+                chatbotInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        const msg = chatbotInput.value.trim();
+                        if (msg) {
+                            sendChatbotMessage(msg);
+                            chatbotInput.value = '';
+                        }
+                    }
+                });
+            }
+            
+            function sendChatbotMessage(text) {
+                // Append user message
+                const userMsg = document.createElement('div');
+                userMsg.className = 'chatbot-msg user';
+                userMsg.textContent = text;
+                chatbotMessages.appendChild(userMsg);
+                chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+                
+                // Append loading status
+                const botMsg = document.createElement('div');
+                botMsg.className = 'chatbot-msg bot loading';
+                botMsg.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> AI is thinking...';
+                chatbotMessages.appendChild(botMsg);
+                chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+                
+                // Fetch API response
+                fetch('/api/chatbot', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    botMsg.classList.remove('loading');
+                    botMsg.innerHTML = data.response;
+                    chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+                })
+                .catch(err => {
+                    botMsg.classList.remove('loading');
+                    botMsg.textContent = "Sorry, I am having trouble connecting right now. Please try again shortly.";
+                });
+            }
+
+            // Notification dropdown toggle
+            const bell = document.getElementById('notification-bell');
+            const menu = document.getElementById('notification-menu');
+            if (bell && menu) {
+                bell.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    menu.classList.toggle('active');
+                });
+                document.addEventListener('click', () => {
+                    menu.classList.remove('active');
+                });
+            }
+            const clearNotif = document.getElementById('clear-notifications');
+            if (clearNotif) {
+                clearNotif.addEventListener('click', () => {
+                    document.querySelectorAll('.notification-item').forEach(item => item.remove());
+                    const badge = document.querySelector('.notification-badge');
+                    if (badge) badge.remove();
+                    const list = document.querySelector('.notification-list');
+                    if (list) list.innerHTML = '<li style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem;">No new notifications</li>';
+                });
+            }
+        });
+    </script>
 
     <!-- Display Flask Flash Messages as Toasts -->
     {% with messages = get_flashed_messages(with_categories=true) %}

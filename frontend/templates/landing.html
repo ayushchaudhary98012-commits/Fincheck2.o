@@ -1,88 +1,170 @@
 {% extends "base.html" %}
 
-{% block title %}FinCheck | AI-Powered Financial Health Analysis{% endblock %}
+{% block title %}FinCheck AI | Peer-to-Peer Lending & Underwriting Platform{% endblock %}
 
 {% block content %}
 <!-- Hero Section -->
-<section class="hero">
+<section class="hero" style="margin-bottom: 60px; min-height: 480px; display: grid; grid-template-columns: 1.2fr 1fr; gap: 40px; align-items: center;">
     <div class="hero-content">
-        <h1>Assess Your <span>Loan Eligibility</span> in Seconds.</h1>
-        <p>FinCheck uses advanced machine learning models and explainable AI to analyze your financial health and determine your loan eligibility status with granular risk breakdown.</p>
-        <div class="hero-buttons">
+        <div class="badge badge-approved" style="display: inline-flex; align-items: center; gap: 6px; margin-bottom: 20px; font-weight: 600; padding: 6px 14px; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2);">
+            <i class="fas fa-sparkles"></i> Next-Gen Peer-to-Peer Lending
+        </div>
+        <h1 style="font-size: 3.2rem; line-height: 1.15; font-weight: 800; margin-bottom: 20px; color: var(--text-primary);">
+            AI-Powered <span style="background: linear-gradient(135deg, var(--primary) 0%, #3b82f6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Trust Scoring</span> & P2P Matching.
+        </h1>
+        <p style="font-size: 1.15rem; line-height: 1.6; color: var(--text-secondary); margin-bottom: 30px; max-width: 580px;">
+            Apply for credit or register as an active lender. FinCheck AI evaluates applicant creditworthiness using machine learning, verifies documents automatically, and pairs you with the perfect counterparties.
+        </p>
+        <div class="hero-buttons" style="display: flex; gap: 15px; flex-wrap: wrap;">
             {% if session.get('user_id') %}
-                <a href="/apply" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Apply for Loan</a>
+                {% if session.get('role') == 'lender' %}
+                    <a href="/lender/dashboard" class="btn btn-primary" style="padding: 12px 28px; font-size: 1rem;"><i class="fas fa-wallet"></i> My Lender Portal</a>
+                {% else %}
+                    <a href="/apply" class="btn btn-primary" style="padding: 12px 28px; font-size: 1rem;"><i class="fas fa-paper-plane"></i> Register for Loan</a>
+                {% endif %}
             {% else %}
-                <a href="/login" class="btn btn-primary"><i class="fas fa-user-plus"></i> Get Started Now</a>
+                <a href="/login" class="btn btn-primary" style="padding: 12px 28px; font-size: 1rem;"><i class="fas fa-user-plus"></i> Get Started as Borrower</a>
+                <a href="/login?register=true&role=lender" class="btn btn-outline" style="padding: 12px 28px; font-size: 1rem; border-color: var(--primary); color: var(--primary);"><i class="fas fa-hand-holding-usd"></i> Become a Lender</a>
             {% endif %}
-            <a href="/calculator" class="btn btn-secondary"><i class="fas fa-calculator"></i> EMI Calculator</a>
+            <a href="/calculator" class="btn btn-secondary" style="padding: 12px 28px; font-size: 1rem; background: rgba(255, 255, 255, 0.05);"><i class="fas fa-calculator"></i> EMI Calculator</a>
         </div>
     </div>
     
     <!-- Hero Image/Mockup Grid -->
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; animation: fadeIn 0.8s ease;">
-        <div class="glass-panel" style="padding: 30px; display: flex; flex-direction: column; justify-content: space-between; height: 180px;">
+        <div class="glass-panel" style="padding: 25px; display: flex; flex-direction: column; justify-content: space-between; height: 160px; border-radius: 16px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="font-weight: 600; font-size: 1.1rem; color: var(--text-secondary);">Approval Speed</div>
-                <div class="badge badge-approved" style="font-size: 0.75rem;">Instant</div>
+                <div style="font-weight: 600; font-size: 1rem; color: var(--text-secondary);">Approval Speed</div>
+                <div class="badge badge-approved" style="font-size: 0.7rem; background: rgba(16, 185, 129, 0.1); color: #10b981; border: none; padding: 3px 8px;">Instant</div>
             </div>
             <div style="font-size: 2.2rem; font-weight: 800; color: var(--primary);">~ 3.5 Sec</div>
-            <div style="font-size: 0.85rem; color: var(--text-muted);">AI inference and validation time</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">AI credit underwriting & ML lookup</div>
         </div>
         
-        <div class="glass-panel" style="padding: 30px; display: flex; flex-direction: column; justify-content: space-between; height: 180px;">
+        <div class="glass-panel" style="padding: 25px; display: flex; flex-direction: column; justify-content: space-between; height: 160px; border-radius: 16px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="font-weight: 600; font-size: 1.1rem; color: var(--text-secondary);">Security Level</div>
-                <i class="fas fa-lock" style="color: var(--success); font-size: 1.2rem;"></i>
+                <div style="font-weight: 600; font-size: 1rem; color: var(--text-secondary);">Trust Verification</div>
+                <i class="fas fa-shield-halved" style="color: var(--success); font-size: 1.1rem;"></i>
             </div>
-            <div style="font-size: 2.2rem; font-weight: 800; color: var(--success);">Military</div>
-            <div style="font-size: 0.85rem; color: var(--text-muted);">AES encryption & SQL protection</div>
+            <div style="font-size: 2.2rem; font-weight: 800; color: var(--success);">5 Levels</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">Self-sovereign KYC credentials</div>
         </div>
         
-        <div class="glass-panel" style="grid-column: span 2; padding: 30px; display: flex; align-items: center; justify-content: space-between; gap: 20px;">
+        <div class="glass-panel" style="grid-column: span 2; padding: 25px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-radius: 16px;">
             <div style="display: flex; flex-direction: column; gap: 4px;">
-                <div style="font-weight: 600; font-size: 1.1rem; color: var(--text-secondary);">Financial Analytics</div>
-                <div style="font-size: 0.9rem; color: var(--text-muted);">Explainable predictions with feature contribution.</div>
+                <div style="font-weight: 600; font-size: 1rem; color: var(--text-secondary);">AI P2P Matching Engine</div>
+                <div style="font-size: 0.85rem; color: var(--text-muted);">Direct borrower-to-lender automated matchmaking.</div>
             </div>
-            <div style="display: flex; gap: 10px; font-size: 1.8rem; color: var(--primary);">
-                <i class="fas fa-chart-line"></i>
-                <i class="fas fa-chart-pie"></i>
-                <i class="fas fa-chart-bar"></i>
+            <div style="display: flex; gap: 12px; font-size: 1.6rem; color: var(--primary);">
+                <i class="fas fa-handshake"></i>
+                <i class="fas fa-bolt"></i>
+                <i class="fas fa-circle-check"></i>
             </div>
         </div>
     </div>
 </section>
 
+<!-- Live Stats Section -->
+<section style="margin-bottom: 60px;">
+    <div class="glass-panel" style="display: grid; grid-template-columns: repeat(4, 1fr); padding: 30px; gap: 20px; border-radius: 20px; text-align: center; background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);">
+        <div>
+            <h3 style="font-size: 2rem; font-weight: 800; color: var(--primary); margin-bottom: 5px;">1,420+</h3>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Active Borrowers</p>
+        </div>
+        <div style="border-left: 1px solid rgba(255, 255, 255, 0.1);">
+            <h3 style="font-size: 2rem; font-weight: 800; color: var(--success); margin-bottom: 5px;">₹12.5 Cr+</h3>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Capital Matched</p>
+        </div>
+        <div style="border-left: 1px solid rgba(255, 255, 255, 0.1);">
+            <h3 style="font-size: 2rem; font-weight: 800; color: #a855f7; margin-bottom: 5px;">94.2%</h3>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Average Compatibility</p>
+        </div>
+        <div style="border-left: 1px solid rgba(255, 255, 255, 0.1);">
+            <h3 style="font-size: 2rem; font-weight: 800; color: #f59e0b; margin-bottom: 5px;">82 / 100</h3>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Avg Trust Score</p>
+        </div>
+    </div>
+</section>
+
 <!-- Features Section -->
-<section class="features-section">
-    <h2 class="section-title">How FinCheck Works</h2>
-    <p class="section-subtitle">A state-of-the-art fintech credit solution that puts powerful predictive analytics in the hands of users and financial institutions.</p>
+<section class="features-section" style="margin-bottom: 60px;">
+    <h2 class="section-title" style="text-align: center; font-size: 2.2rem; font-weight: 800; margin-bottom: 10px;">Platform Core Features</h2>
+    <p class="section-subtitle" style="text-align: center; color: var(--text-secondary); margin-bottom: 40px; max-width: 700px; margin-left: auto; margin-right: auto;">
+        A state-of-the-art fintech credit environment that simplifies peer-to-peer relationships using explainable AI.
+    </p>
     
-    <div class="feature-grid">
+    <div class="feature-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px;">
         <!-- Feature 1 -->
-        <div class="glass-panel feature-card">
-            <div class="feature-icon">
+        <div class="glass-panel feature-card" style="padding: 30px; border-radius: 16px; transition: transform 0.3s ease;">
+            <div class="feature-icon" style="font-size: 2rem; color: var(--primary); margin-bottom: 20px;">
                 <i class="fas fa-brain"></i>
             </div>
-            <h3>AI Eligibility Engine</h3>
-            <p>Our Random Forest Classifier uses multiple financial criteria to calculate the exact probability of loan approval in real-time.</p>
+            <h3 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 10px;">AI Eligibility Underwriting</h3>
+            <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5;">
+                Our trained Random Forest ML Classifier evaluates multi-dimensional financial factors, providing dynamic eligibility scoring and risk tiers.
+            </p>
         </div>
         
         <!-- Feature 2 -->
-        <div class="glass-panel feature-card">
-            <div class="feature-icon">
-                <i class="fas fa-file-shield"></i>
+        <div class="glass-panel feature-card" style="padding: 30px; border-radius: 16px; transition: transform 0.3s ease;">
+            <div class="feature-icon" style="font-size: 2rem; color: var(--success); margin-bottom: 20px;">
+                <i class="fas fa-handshake-angle"></i>
             </div>
-            <h3>Explainable AI (XAI)</h3>
-            <p>We don't just output a number. FinCheck explains exactly why a prediction was made, showing negative and positive factors.</p>
+            <h3 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 10px;">P2P Matching Engine</h3>
+            <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5;">
+                Directly matches borrowers with lenders based on trust levels, target amounts, interest criteria, locations, and repayment duration.
+            </p>
         </div>
         
         <!-- Feature 3 -->
-        <div class="glass-panel feature-card">
-            <div class="feature-icon">
-                <i class="fas fa-user-tie"></i>
+        <div class="glass-panel feature-card" style="padding: 30px; border-radius: 16px; transition: transform 0.3s ease;">
+            <div class="feature-icon" style="font-size: 2rem; color: #f59e0b; margin-bottom: 20px;">
+                <i class="fas fa-shield-halved"></i>
             </div>
-            <h3>Institution Portal</h3>
-            <p>A comprehensive admin workspace where lenders can search, filter, override statuses, and audit approval statistics.</p>
+            <h3 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 10px;">Dynamic Trust score</h3>
+            <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5;">
+                Earn credibility points by completing KYC and document verification (PAN, Aadhaar, bank statements, salary slips, and business registrations).
+            </p>
+        </div>
+    </div>
+</section>
+
+<!-- Success Stories Testimonial Section -->
+<section style="margin-bottom: 60px;">
+    <h2 class="section-title" style="text-align: center; font-size: 2.2rem; font-weight: 800; margin-bottom: 10px;">Success Stories</h2>
+    <p class="section-subtitle" style="text-align: center; color: var(--text-secondary); margin-bottom: 40px;">Hear what our community has to say about the P2P match ecosystem.</p>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+        <div class="glass-panel" style="padding: 30px; border-radius: 18px; position: relative;">
+            <i class="fas fa-quote-left" style="position: absolute; right: 30px; top: 30px; font-size: 2.5rem; color: rgba(255, 255, 255, 0.05);"></i>
+            <p style="font-size: 0.95rem; line-height: 1.6; color: var(--text-secondary); margin-bottom: 20px; font-style: italic;">
+                "FinCheck AI matched me with an active lender within minutes of submitting my application. The instant document verification unlocked the profile status, and contact sharing allowed us to close the ₹5 Lakh loan seamlessly offline!"
+            </p>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 44px; height: 44px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff;">
+                    AC
+                </div>
+                <div>
+                    <h5 style="font-weight: 700; margin: 0; font-size: 0.95rem; color: var(--text-primary);">Ayush Chaudhary</h5>
+                    <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">Vendor / Small Business Borrower</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-panel" style="padding: 30px; border-radius: 18px; position: relative;">
+            <i class="fas fa-quote-left" style="position: absolute; right: 30px; top: 30px; font-size: 2.5rem; color: rgba(255, 255, 255, 0.05);"></i>
+            <p style="font-size: 0.95rem; line-height: 1.6; color: var(--text-secondary); margin-bottom: 20px; font-style: italic;">
+                "By setting my minimum trust score filter to 75, I reduced my defaults to zero. The matching engine handles the compatibility sorting, and the dashboard provides full credit explanations. Highly recommended!"
+            </p>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 44px; height: 44px; border-radius: 50%; background: var(--success); display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff;">
+                    RM
+                </div>
+                <div>
+                    <h5 style="font-weight: 700; margin: 0; font-size: 0.95rem; color: var(--text-primary);">Rohan Mehta</h5>
+                    <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">P2P Lender Investor</p>
+                </div>
+            </div>
         </div>
     </div>
 </section>

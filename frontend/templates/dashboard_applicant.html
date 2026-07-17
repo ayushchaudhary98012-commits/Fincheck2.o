@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 
-{% block title %}FinCheck | Applicant Dashboard{% endblock %}
+{% block title %}FinCheck | Borrower Dashboard{% endblock %}
 
 {% block content %}
 <div class="dashboard-container">
     <!-- Sidebar -->
     <aside class="sidebar">
-        <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; padding: 0 16px;">Menu</div>
+        <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; padding: 0 16px; margin-bottom: 15px;">Menu</div>
         <ul class="sidebar-menu">
             <li>
                 <a href="/applicant/dashboard" class="sidebar-link active">
-                    <i class="fas fa-chart-pie"></i> Portal Overview
+                    <i class="fas fa-columns"></i> Portal Overview
                 </a>
             </li>
             <li>
@@ -25,7 +25,7 @@
             </li>
             <li>
                 <a href="/applicant/verification" class="sidebar-link">
-                    <i class="fas fa-shield-halved"></i> Verify Trust
+                    <i class="fas fa-check-double"></i> Verify Trust
                 </a>
             </li>
         </ul>
@@ -33,18 +33,90 @@
     
     <!-- Main Content Area -->
     <main class="dashboard-content">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 15px;">
             <div>
-                <h1 style="font-size: 1.85rem; font-weight: 700; margin-bottom: 6px;">Welcome Back, {{ session.get('username') }}!</h1>
-                <p style="color: var(--text-secondary);">Monitor your financial checkups and loan eligibility applications.</p>
+                <h1 style="font-size: 1.85rem; font-weight: 700; margin-bottom: 6px; color: var(--text-primary);">Borrower Portal Overview</h1>
+                <p style="color: var(--text-secondary);">Monitor your financial checkups, trust level, and lender matchmaking.</p>
             </div>
             <a href="/apply" class="btn btn-primary">
                 <i class="fas fa-plus"></i> New Application
             </a>
         </div>
+
+        <!-- Upper Profile Progress & Timeline Section -->
+        <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 30px; margin-bottom: 30px;">
+            <!-- Profile Verification Completion -->
+            <div class="glass-panel" style="padding: 25px; border-radius: 16px;">
+                <h4 style="font-weight: 700; margin-bottom: 15px; color: var(--text-primary);">Trust Profile Verification</h4>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-size: 0.9rem; color: var(--text-secondary);">Verification Progress</span>
+                    <strong style="font-size: 1rem; color: var(--primary);">{{ trust_score }}%</strong>
+                </div>
+                <div class="progress-bar-container" style="background: rgba(255,255,255,0.05); height: 10px; border-radius: 5px; overflow: hidden; margin-bottom: 20px;">
+                    <div class="progress-bar-fill" style="width: {{ trust_score }}%; background: linear-gradient(90deg, var(--primary) 0%, #10b981 100%); height: 100%; border-radius: 5px; transition: width 0.6s ease;"></div>
+                </div>
+                <div style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 15px;">
+                    Your profile trust rating is in the <strong>{{ trust_level }}</strong> tier. Complete your document checks (PAN, Aadhaar, salary slip, bank statement) to reach 100% and unlock lower-interest matches.
+                </div>
+                <a href="/applicant/verification" class="btn btn-outline" style="width: 100%; text-align: center; font-size: 0.85rem; padding: 10px;">
+                    <i class="fas fa-shield-halved"></i> Upload Documents
+                </a>
+            </div>
+
+            <!-- Loan Underwriting Timeline -->
+            <div class="glass-panel" style="padding: 25px; border-radius: 16px;">
+                <h4 style="font-weight: 700; margin-bottom: 15px; color: var(--text-primary);">Application Process Timeline</h4>
+                {% if apps %}
+                    {% set latest = apps[0] %}
+                    <div style="display: flex; flex-direction: column; gap: 15px;">
+                        <div style="display: flex; gap: 12px; align-items: flex-start;">
+                            <div style="background: var(--success); color: #fff; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem;"><i class="fas fa-check"></i></div>
+                            <div>
+                                <h5 style="margin: 0; font-size: 0.9rem; font-weight: 600; color: var(--text-primary);">Application Submitted</h5>
+                                <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">Reference #AP-{{ latest.id }} submitted on {{ latest.created_at[:10] }}</p>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 12px; align-items: flex-start;">
+                            <div style="background: {% if trust_score > 30 %}var(--success){% else %}var(--primary){% endif %}; color: #fff; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem;">
+                                {% if trust_score > 30 %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-circle-notch fa-spin"></i>{% endif %}
+                            </div>
+                            <div>
+                                <h5 style="margin: 0; font-size: 0.9rem; font-weight: 600; color: var(--text-primary);">KYC Document Auto-Verification</h5>
+                                <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">
+                                    {% if trust_score > 30 %}Documents verified successfully. Trust level updated.{% else %}Awaiting document uploads for trust calculations.{% endif %}
+                                </p>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 12px; align-items: flex-start;">
+                            <div style="background: var(--success); color: #fff; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem;"><i class="fas fa-check"></i></div>
+                            <div>
+                                <h5 style="margin: 0; font-size: 0.9rem; font-weight: 600; color: var(--text-primary);">AI Credit Underwriting</h5>
+                                <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">Model prediction status: <strong>{{ latest.status }}</strong> (Score: {{ latest.eligibility_score }}/100)</p>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 12px; align-items: flex-start;">
+                            <div style="background: {% if matches %}var(--success){% else %}rgba(255,255,255,0.1){% endif %}; color: #fff; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem;">
+                                {% if matches %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-hourglass"></i>{% endif %}
+                            </div>
+                            <div>
+                                <h5 style="margin: 0; font-size: 0.9rem; font-weight: 600; color: var(--text-primary);">P2P Lender Matching</h5>
+                                <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">
+                                    {% if matches %}{{ matches|length }} Lenders matched with your preferences.{% else %}Searching for lenders meeting DTI criteria...{% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div style="text-align: center; color: var(--text-muted); padding: 20px 0;">
+                        <i class="fas fa-clock-rotate-left" style="font-size: 2rem; margin-bottom: 10px;"></i>
+                        <p style="font-size: 0.85rem; margin: 0;">Submit an application to view process status.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
         
         <!-- Quick Stats Grid -->
-        <div class="stats-grid">
+        <div class="stats-grid" style="margin-bottom: 30px;">
             <div class="glass-panel stat-card">
                 <div class="stat-info">
                     <h3>Submitted Checks</h3>
@@ -92,11 +164,108 @@
                 </div>
             </div>
         </div>
+
+        <!-- P2P Lending Match Panel -->
+        <div class="glass-panel" style="padding: 25px; border-radius: 16px; margin-bottom: 30px;">
+            <h3 style="font-weight: 700; font-size: 1.25rem; margin-bottom: 20px; color: var(--text-primary); display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-handshake" style="color: var(--primary);"></i> My Lending Matches
+            </h3>
+            
+            {% if matches %}
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
+                    {% for match in matches %}
+                        <div class="glass-panel" style="padding: 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-weight: 700; font-size: 1.05rem; color: var(--text-primary);">Lender: {{ match.lender_name }}</span>
+                                    <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-size: 0.75rem; font-weight: 600; border: 1px solid rgba(16,185,129,0.2);">
+                                        Trust: {{ match.lender_trust_score }}/100
+                                    </span>
+                                </div>
+                                <div class="badge" style="background: rgba(59, 130, 246, 0.15); color: #3b82f6; font-size: 0.8rem; font-weight: 600;">
+                                    {{ match.compatibility_score }}% Match
+                                </div>
+                            </div>
+                            
+                            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                                    <span>Offered Interest Rate:</span>
+                                    <strong>{{ match.interest_rate }}% APR</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                                    <span>My Match Decision:</span>
+                                    <span class="badge {% if match.borrower_status == 'Accepted' %}badge-approved{% elif match.borrower_status == 'Rejected' %}badge-rejected{% else %}badge-pending{% endif %}">
+                                        {{ match.borrower_status }}
+                                    </span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                                    <span>Lender Match Decision:</span>
+                                    <span class="badge {% if match.lender_status == 'Accepted' %}badge-approved{% elif match.lender_status == 'Rejected' %}badge-rejected{% else %}badge-pending{% endif %}">
+                                        {{ match.lender_status }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 15px;">
+                                <strong style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">Matching Criteria:</strong>
+                                <ul style="margin: 4px 0 0 15px; padding: 0;">
+                                    {% for r in match.reasons %}
+                                        <li>{{ r }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+
+                            {% if match.borrower_status == 'Accepted' and match.lender_status == 'Accepted' %}
+                                <div style="border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 15px; margin-top: 10px;">
+                                    <div style="background: rgba(16, 185, 129, 0.1); color: #10b981; padding: 10px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+                                        <i class="fas fa-lock-open"></i> <strong>Contact Details Unlocked!</strong>
+                                    </div>
+                                    <div style="font-size: 0.85rem; color: var(--text-secondary);">
+                                        <p style="margin: 2px 0;"><i class="fas fa-envelope"></i> Email: <a href="mailto:{{ match.lender_email }}" style="color: var(--primary);">{{ match.lender_email }}</a></p>
+                                        <p style="margin: 2px 0;"><i class="fas fa-phone"></i> Phone: <a href="tel:{{ match.lender_phone }}" style="color: var(--primary);">{{ match.lender_phone }}</a></p>
+                                    </div>
+                                </div>
+                            {% else %}
+                                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                                    {% if match.borrower_status == 'Pending' %}
+                                        <form action="/api/matches/{{ match.match_id }}/action" method="POST" style="flex: 1;">
+                                            <input type="hidden" name="action" value="Accepted">
+                                            <button type="submit" class="btn btn-primary" style="width: 100%; padding: 8px; font-size: 0.8rem;">
+                                                <i class="fas fa-check"></i> Accept Match
+                                            </button>
+                                        </form>
+                                        <form action="/api/matches/{{ match.match_id }}/action" method="POST" style="flex: 1;">
+                                            <input type="hidden" name="action" value="Rejected">
+                                            <button type="submit" class="btn btn-secondary" style="width: 100%; padding: 8px; font-size: 0.8rem; background: rgba(239, 68, 68, 0.15); color: #ef4444; border-color: rgba(239,68,68,0.2);">
+                                                <i class="fas fa-times"></i> Decline
+                                            </button>
+                                        </form>
+                                    {% elif match.borrower_status == 'Accepted' %}
+                                        <div style="font-size: 0.85rem; color: var(--text-muted); text-align: center; width: 100%; padding: 8px; background: rgba(255,255,255,0.03); border-radius: 6px;">
+                                            <i class="fas fa-hourglass-half"></i> You accepted. Awaiting lender response...
+                                        </div>
+                                    {% else %}
+                                        <div style="font-size: 0.85rem; color: #ef4444; text-align: center; width: 100%; padding: 8px; background: rgba(239,68,68,0.05); border-radius: 6px;">
+                                            <i class="fas fa-circle-xmark"></i> You declined this match pairing.
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div style="text-align: center; padding: 30px; color: var(--text-muted);">
+                    <i class="fas fa-network-wired" style="font-size: 2.5rem; margin-bottom: 12px; color: rgba(255,255,255,0.1);"></i>
+                    <p style="font-size: 0.9rem; margin: 0;">No active matches found. Build your trust score or modify requested loan details to attract peer lenders.</p>
+                </div>
+            {% endif %}
+        </div>
         
         <!-- Application History Table -->
         <div class="glass-panel table-card">
             <div class="table-header">
-                <h3>Application History</h3>
+                <h3 style="font-weight: 700; color: var(--text-primary);">Application Credit Assessments</h3>
             </div>
             
             <div class="table-wrapper">

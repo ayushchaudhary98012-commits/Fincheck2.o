@@ -1,0 +1,405 @@
+{% extends "base.html" %}
+
+{% block title %}FinCheck | Two-Factor Verification{% endblock %}
+
+{% block content %}
+<style>
+    .otp-card {
+        max-width: 480px;
+        margin: 60px auto;
+        padding: 40px;
+        text-align: center;
+    }
+    
+    .security-icon {
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        background-color: var(--primary-light);
+        color: var(--primary);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.2rem;
+        margin-bottom: 24px;
+        animation: pulse 2s infinite;
+    }
+    
+    .otp-title {
+        font-size: 1.8rem;
+        font-weight: 700;
+        margin-bottom: 8px;
+        color: var(--text-primary);
+    }
+    
+    .otp-subtitle {
+        color: var(--text-secondary);
+        font-size: 0.95rem;
+        margin-bottom: 30px;
+    }
+    
+    .otp-email-highlight {
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+    
+    .otp-input-group {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        margin: 30px 0;
+    }
+    
+    .otp-box {
+        width: 50px;
+        height: 60px;
+        font-size: 1.8rem;
+        font-weight: 700;
+        text-align: center;
+        border-radius: 12px;
+        border: 1px solid var(--glass-border);
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
+        transition: var(--transition);
+    }
+    
+    .otp-box:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px var(--primary-light);
+        transform: translateY(-2px);
+    }
+    
+    .timer-container {
+        margin: 20px 0;
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+    }
+    
+    .timer-count {
+        font-weight: 700;
+        color: var(--primary);
+    }
+    
+    .btn-verify {
+        width: 100%;
+        padding: 14px;
+        font-size: 1rem;
+        margin-bottom: 15px;
+    }
+    
+    .resend-container {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+    }
+    
+    .resend-link {
+        color: var(--primary);
+        text-decoration: none;
+        font-weight: 600;
+        background: none;
+        border: none;
+        padding: 0;
+        cursor: pointer;
+        transition: var(--transition);
+    }
+    
+    .resend-link:disabled {
+        color: var(--text-muted);
+        cursor: not-allowed;
+        font-weight: 500;
+    }
+    
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-secondary);
+        text-decoration: none;
+        font-size: 0.9rem;
+        margin-top: 25px;
+        transition: var(--transition);
+    }
+    
+    .back-link:hover {
+        color: var(--primary);
+    }
+    
+    @keyframes pulse {
+        0% {
+            box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4);
+        }
+        70% {
+            box-shadow: 0 0 0 15px rgba(37, 99, 235, 0);
+        }
+        100% {
+            box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+        }
+    }
+    
+    .spinner-loader {
+        display: none;
+        margin-right: 8px;
+    }
+</style>
+
+<div class="glass-panel otp-card">
+    <div class="security-icon">
+        <i class="fas fa-shield-halved"></i>
+    </div>
+    
+    <h2 class="otp-title">Enter Verification Code</h2>
+    <p class="otp-subtitle">Enter the 6-digit verification code sent to your email:<br>
+        <span class="otp-email-highlight">{{ email }}</span>
+    </p>
+    
+    <form id="form-otp" autocomplete="off">
+        <div class="otp-input-group">
+            <input type="text" class="otp-box" maxlength="1" data-index="1" pattern="[0-9]*" inputmode="numeric" required autofocus>
+            <input type="text" class="otp-box" maxlength="1" data-index="2" pattern="[0-9]*" inputmode="numeric" required>
+            <input type="text" class="otp-box" maxlength="1" data-index="3" pattern="[0-9]*" inputmode="numeric" required>
+            <input type="text" class="otp-box" maxlength="1" data-index="4" pattern="[0-9]*" inputmode="numeric" required>
+            <input type="text" class="otp-box" maxlength="1" data-index="5" pattern="[0-9]*" inputmode="numeric" required>
+            <input type="text" class="otp-box" maxlength="1" data-index="6" pattern="[0-9]*" inputmode="numeric" required>
+        </div>
+        
+        <div class="timer-container">
+            OTP expires in <span class="timer-count" id="expiry-timer">05:00</span>
+        </div>
+        
+        <button type="submit" id="btn-verify" class="btn btn-primary btn-verify">
+            <i class="fas fa-circle-notch fa-spin spinner-loader" id="verify-spinner"></i>
+            <span id="verify-text"><i class="fas fa-key"></i> Verify Code</span>
+        </button>
+    </form>
+    
+    <div class="resend-container">
+        Didn't receive the code? 
+        <button id="btn-resend" class="resend-link" disabled>Resend Code (30s)</button>
+    </div>
+    
+    <a href="/login" class="back-link">
+        <i class="fas fa-arrow-left"></i> Back to Login
+    </a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const otpBoxes = document.querySelectorAll('.otp-box');
+        const formOtp = document.getElementById('form-otp');
+        const btnVerify = document.getElementById('btn-verify');
+        const verifyText = document.getElementById('verify-text');
+        const verifySpinner = document.getElementById('verify-spinner');
+        const btnResend = document.getElementById('btn-resend');
+        const expiryTimer = document.getElementById('expiry-timer');
+        
+        const emailAddress = "{{ email }}";
+        
+        // Timer settings
+        let expirySeconds = 300; // 5 minutes
+        let resendSeconds = 30; // 30 seconds resend lock
+        let expiryInterval = null;
+        let resendInterval = null;
+        
+        function startExpiryTimer() {
+            clearInterval(expiryInterval);
+            expirySeconds = 300;
+            updateExpiryDisplay();
+            
+            expiryInterval = setInterval(() => {
+                expirySeconds--;
+                updateExpiryDisplay();
+                
+                if (expirySeconds <= 0) {
+                    clearInterval(expiryInterval);
+                    btnVerify.disabled = true;
+                    btnVerify.style.opacity = '0.5';
+                    btnVerify.style.cursor = 'not-allowed';
+                    verifyText.innerHTML = '<i class="fas fa-triangle-exclamation"></i> Code Expired';
+                    showToast('OTP has expired. Please request a new code.', 'error');
+                    
+                    // Enable resend immediately if expired
+                    btnResend.disabled = false;
+                    btnResend.innerText = "Generate New OTP";
+                }
+            }, 1000);
+        }
+        
+        function updateExpiryDisplay() {
+            const minutes = Math.floor(expirySeconds / 60);
+            const seconds = expirySeconds % 60;
+            expiryTimer.innerText = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+        
+        function startResendTimer() {
+            clearInterval(resendInterval);
+            resendSeconds = 30;
+            btnResend.disabled = true;
+            btnResend.innerText = `Resend Code (${resendSeconds}s)`;
+            
+            resendInterval = setInterval(() => {
+                resendSeconds--;
+                if (resendSeconds <= 0) {
+                    clearInterval(resendInterval);
+                    btnResend.disabled = false;
+                    btnResend.innerText = "Resend Code";
+                } else {
+                    btnResend.innerText = `Resend Code (${resendSeconds}s)`;
+                }
+            }, 1000);
+        }
+        
+        // Initial setup
+        startExpiryTimer();
+        startResendTimer();
+        
+        // OTP Inputs Interactivity
+        otpBoxes.forEach((box, index) => {
+            box.addEventListener('input', (e) => {
+                // Keep only numeric values
+                box.value = box.value.replace(/[^0-9]/g, '');
+                
+                if (box.value.length === 1 && index < otpBoxes.length - 1) {
+                    otpBoxes[index + 1].focus();
+                }
+            });
+            
+            box.addEventListener('keydown', (e) => {
+                if (e.key === 'Backspace' && box.value.length === 0 && index > 0) {
+                    otpBoxes[index - 1].focus();
+                }
+            });
+            
+            box.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const pastedData = (e.clipboardData || window.clipboardData).getData('text');
+                const cleanData = pastedData.replace(/[^0-9]/g, '').substring(0, 6);
+                
+                if (cleanData.length > 0) {
+                    for (let i = 0; i < cleanData.length; i++) {
+                        if (otpBoxes[i]) {
+                            otpBoxes[i].value = cleanData[i];
+                        }
+                    }
+                    // Focus last box filled
+                    const targetFocusIndex = Math.min(cleanData.length, otpBoxes.length - 1);
+                    otpBoxes[targetFocusIndex].focus();
+                }
+            });
+        });
+        
+        // Form submission
+        formOtp.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            let code = "";
+            otpBoxes.forEach(box => code += box.value);
+            
+            if (code.length !== 6) {
+                showToast("Please enter the full 6-digit code.", "error");
+                return;
+            }
+            
+            // Set loading state
+            btnVerify.disabled = true;
+            verifySpinner.style.display = 'inline-block';
+            verifyText.innerText = "Verifying...";
+            
+            fetch('/api/auth/verify-otp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    email: emailAddress,
+                    otp: code
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    // Success state
+                    verifySpinner.className = 'fas fa-check-double';
+                    verifySpinner.style.color = 'var(--success)';
+                    verifyText.innerText = "Success! Redirecting...";
+                    showToast("Authentication successful! Redirecting to Dashboard.", "success");
+                    
+                    // Store JWT token locally
+                    if (data.token) {
+                        localStorage.setItem('jwt_token', data.token);
+                    }
+                    
+                    setTimeout(() => {
+                        // Redirect to the appropriate dashboard
+                        if (data.user.role === 'admin') {
+                            window.location.href = '/admin/dashboard';
+                        } else if (data.user.role === 'lender') {
+                            window.location.href = '/lender/dashboard';
+                        } else {
+                            window.location.href = '/applicant/dashboard';
+                        }
+                    }, 1200);
+                } else {
+                    // Reset button states
+                    btnVerify.disabled = false;
+                    verifySpinner.style.display = 'none';
+                    verifyText.innerHTML = '<i class="fas fa-key"></i> Verify Code';
+                    showToast(data.error || "Verification failed.", "error");
+                }
+            })
+            .catch(err => {
+                btnVerify.disabled = false;
+                verifySpinner.style.display = 'none';
+                verifyText.innerHTML = '<i class="fas fa-key"></i> Verify Code';
+                showToast("Something went wrong. Please try again.", "error");
+            });
+        });
+        
+        // Resend Button Action
+        btnResend.addEventListener('click', () => {
+            btnResend.disabled = true;
+            btnResend.innerText = "Sending OTP...";
+            
+            fetch('/api/auth/resend-otp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    email: emailAddress
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showToast("A new verification code has been sent.", "success");
+                    // Reset input fields
+                    otpBoxes.forEach(box => box.value = '');
+                    otpBoxes[0].focus();
+                    
+                    // Reset verify button state if it was disabled due to expiry
+                    btnVerify.disabled = false;
+                    btnVerify.style.opacity = '1';
+                    btnVerify.style.cursor = 'pointer';
+                    verifyText.innerHTML = '<i class="fas fa-key"></i> Verify Code';
+                    
+                    // Restart timers
+                    startExpiryTimer();
+                    startResendTimer();
+                } else {
+                    showToast(data.error || "Resend failed.", "error");
+                    btnResend.disabled = false;
+                    btnResend.innerText = "Resend Code";
+                }
+            })
+            .catch(err => {
+                showToast("Something went wrong. Please try again.", "error");
+                btnResend.disabled = false;
+                btnResend.innerText = "Resend Code";
+            });
+        });
+    });
+</script>
+{% endblock %}

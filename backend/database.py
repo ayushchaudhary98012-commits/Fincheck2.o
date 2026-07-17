@@ -92,6 +92,47 @@ def init_db():
         )
     ''')
     
+    # Create Lender Preferences table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS lender_preferences (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL UNIQUE,
+            max_lending_amount REAL DEFAULT 2000000.0,
+            min_trust_score INTEGER DEFAULT 60,
+            interest_rate REAL DEFAULT 10.5,
+            preferred_location TEXT DEFAULT 'All',
+            preferred_duration INTEGER DEFAULT 24,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+    
+    # Create Matches table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS matches (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            lender_id INTEGER NOT NULL,
+            application_id INTEGER NOT NULL,
+            compatibility_score INTEGER DEFAULT 80,
+            reasons TEXT DEFAULT '[]',
+            lender_status TEXT NOT NULL DEFAULT 'Pending',
+            borrower_status TEXT NOT NULL DEFAULT 'Pending',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (lender_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE
+        )
+    ''')
+    
+    # Create OTPs table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS otps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            otp TEXT NOT NULL,
+            expires_at TIMESTAMP NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
     # Check if a seed admin user exists, if not create one
     cursor.execute("SELECT * FROM users WHERE role = 'admin'")
     if not cursor.fetchone():
@@ -106,10 +147,21 @@ def init_db():
             "INSERT INTO users (username, password_hash, email, role) VALUES (?, ?, ?, ?)",
             ('user', applicant_pass, 'user@fincheck.com', 'applicant')
         )
+        # Create a default lender
+        lender_pass = generate_password_hash('lender123')
+        cursor.execute(
+            "INSERT INTO users (username, password_hash, email, role) VALUES (?, ?, ?, ?)",
+            ('lender', lender_pass, 'lender@fincheck.com', 'lender')
+        )
+        lender_id = cursor.lastrowid
+        cursor.execute(
+            "INSERT INTO lender_preferences (user_id, max_lending_amount, min_trust_score, interest_rate, preferred_location, preferred_duration) VALUES (?, ?, ?, ?, ?, ?)",
+            (lender_id, 2000000.0, 60, 10.5, 'All', 24)
+        )
     
     conn.commit()
     conn.close()
-
+    
 if __name__ == '__main__':
     print("Initializing database...")
     init_db()

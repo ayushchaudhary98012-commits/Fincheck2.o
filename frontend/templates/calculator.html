@@ -14,22 +14,37 @@
         <div>
             <!-- Amount -->
             <div class="slider-group">
-                <div class="slider-header">
-                    <span>Loan Amount (₹)</span>
-                    <span id="calc-amount-val" class="slider-val">₹100,000</span>
+                <div class="slider-header" style="align-items: center; gap: 10px;">
+                    <span>Loan Amount</span>
+                    <div class="input-inline-wrap">
+                        <span class="currency-symbol">₹</span>
+                        <input type="number" id="calc-amount-input" class="inline-calc-input" min="5000" max="10000000" step="1000" value="100000">
+                    </div>
                 </div>
-                <input type="range" id="calc-amount" class="range-slider" min="5000" max="500000" step="5000" value="100000">
+                <input type="range" id="calc-amount" class="range-slider" min="5000" max="2000000" step="5000" value="100000">
                 <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
                     <span>Min: ₹5k</span>
-                    <span>Max: ₹500k</span>
+                    <span>Max: ₹2,000k</span>
+                </div>
+                
+                <!-- Quick Select Chips -->
+                <div class="quick-select-chips">
+                    <button class="chip-btn" data-value="50000">₹50k</button>
+                    <button class="chip-btn active" data-value="100000">₹1 Lakh</button>
+                    <button class="chip-btn" data-value="200000">₹2 Lakh</button>
+                    <button class="chip-btn" data-value="500000">₹5 Lakh</button>
+                    <button class="chip-btn" data-value="1000000">₹10 Lakh</button>
                 </div>
             </div>
             
             <!-- Rate -->
             <div class="slider-group">
-                <div class="slider-header">
-                    <span>Annual Interest Rate (%)</span>
-                    <span id="calc-rate-val" class="slider-val">9.0%</span>
+                <div class="slider-header" style="align-items: center; gap: 10px;">
+                    <span>Annual Interest Rate</span>
+                    <div class="input-inline-wrap">
+                        <input type="number" id="calc-rate-input" class="inline-calc-input" min="0.1" max="30" step="0.1" value="9.0" style="width: 60px;">
+                        <span class="currency-symbol" style="margin-left: 4px; margin-right: 0;">%</span>
+                    </div>
                 </div>
                 <input type="range" id="calc-rate" class="range-slider" min="1" max="25" step="0.1" value="9.0">
                 <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
@@ -40,9 +55,12 @@
             
             <!-- Tenure -->
             <div class="slider-group">
-                <div class="slider-header">
-                    <span>Loan Tenure (Years)</span>
-                    <span id="calc-tenure-val" class="slider-val">10 Years</span>
+                <div class="slider-header" style="align-items: center; gap: 10px;">
+                    <span>Loan Tenure</span>
+                    <div class="input-inline-wrap">
+                        <input type="number" id="calc-tenure-input" class="inline-calc-input" min="1" max="35" step="1" value="10" style="width: 50px;">
+                        <span class="currency-symbol" style="margin-left: 4px; margin-right: 0;">Yrs</span>
+                    </div>
                 </div>
                 <input type="range" id="calc-tenure" class="range-slider" min="1" max="30" step="1" value="10">
                 <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">

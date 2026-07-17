@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}FinCheck | Vendor Document Verification & Trust Score{% endblock %}
+{% block title %}FinCheck | Trust Verification & Document Center{% endblock %}
 
 {% block content %}
 <style>
@@ -9,6 +9,8 @@
         justify-content: space-between;
         align-items: center;
         margin-bottom: 30px;
+        flex-wrap: wrap;
+        gap: 15px;
     }
     
     .trust-container {
@@ -16,6 +18,12 @@
         grid-template-columns: 1fr 2fr;
         gap: 30px;
         margin-bottom: 40px;
+    }
+    
+    @media (max-width: 992px) {
+        .trust-container {
+            grid-template-columns: 1fr;
+        }
     }
     
     .trust-score-card {
@@ -88,7 +96,7 @@
     
     .upload-grid {
         display: grid;
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
         gap: 20px;
     }
     
@@ -157,10 +165,10 @@
 
 <div class="verification-header">
     <div>
-        <h2 style="font-weight: 700; color: var(--text-primary);">Document Verification Center</h2>
-        <p style="color: var(--text-secondary);">Verify your business credentials to check and increase your Trust Score rating.</p>
+        <h2 style="font-weight: 700; color: var(--text-primary);">Document Trust Center</h2>
+        <p style="color: var(--text-secondary);">Verify your financial credentials to calculate your Platform Trust Score.</p>
     </div>
-    <a href="/applicant/dashboard" class="btn btn-secondary">
+    <a href="{% if session.get('role') == 'lender' %}/lender/dashboard{% else %}/applicant/dashboard{% endif %}" class="btn btn-secondary">
         <i class="fas fa-arrow-left"></i> Back to Dashboard
     </a>
 </div>
@@ -168,7 +176,7 @@
 <div class="trust-container">
     <!-- Trust Score Gauge -->
     <div class="glass-panel trust-score-card">
-        <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 25px; text-transform: uppercase; letter-spacing: 1px;">Vendor Trust Rating</h3>
+        <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 25px; text-transform: uppercase; letter-spacing: 1px;">Overall Trust Rating</h3>
         
         <div class="trust-gauge">
             <svg viewBox="0 0 100 100">
@@ -193,7 +201,7 @@
             </div>
             <div class="trust-metric-row">
                 <span>Total Documents:</span>
-                <strong id="verified-docs-count">0/4 Approved</strong>
+                <strong id="verified-docs-count">0/5 Approved</strong>
             </div>
         </div>
     </div>
@@ -205,8 +213,8 @@
             <div class="upload-icon">
                 <i class="fas fa-address-card"></i>
             </div>
-            <h4 style="font-weight: 600; margin-bottom: 4px;">PAN Verification</h4>
-            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">Permanent Account Number Card (PDF, PNG, JPG)</p>
+            <h4 style="font-weight: 600; margin-bottom: 4px;">PAN Card</h4>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">Permanent Account Number (PDF, PNG, JPG)</p>
             
             <div class="status-indicator" style="margin-bottom: 15px;">
                 <span class="badge badge-pending" style="display: none;">Pending</span>
@@ -222,13 +230,35 @@
             <div class="feedback-note" id="feedback-pan_verification"></div>
         </div>
         
+        <!-- Card 2: Aadhaar Verification -->
+        <div class="upload-card" id="card-aadhaar_verification">
+            <div class="upload-icon">
+                <i class="fas fa-id-card"></i>
+            </div>
+            <h4 style="font-weight: 600; margin-bottom: 4px;">Aadhaar Card</h4>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">National Identity Card Front & Back (PDF, PNG, JPG)</p>
+            
+            <div class="status-indicator" style="margin-bottom: 15px;">
+                <span class="badge badge-pending" style="display: none;">Pending</span>
+                <span class="badge badge-approved" style="display: none;">Verified</span>
+                <span class="badge badge-rejected" style="display: none;">Rejected</span>
+                <span class="badge" style="background-color: var(--glass-border); color: var(--text-secondary); display: inline-block;">Not Uploaded</span>
+            </div>
+            
+            <div class="upload-btn-wrapper">
+                <button class="btn btn-outline btn-sm">Upload File</button>
+                <input type="file" name="file" data-type="aadhaar_verification" onchange="uploadFile(this)">
+            </div>
+            <div class="feedback-note" id="feedback-aadhaar_verification"></div>
+        </div>
+        
         <!-- Card 3: Bank Statement -->
         <div class="upload-card" id="card-bank_statement">
             <div class="upload-icon">
                 <i class="fas fa-file-invoice-dollar"></i>
             </div>
-            <h4 style="font-weight: 600; margin-bottom: 4px;">Financial Audits / Statements</h4>
-            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">Latest 3 months corporate bank statement or audit (PDF)</p>
+            <h4 style="font-weight: 600; margin-bottom: 4px;">Bank Statements</h4>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">Latest 3 months corporate or savings bank statement (PDF)</p>
             
             <div class="status-indicator" style="margin-bottom: 15px;">
                 <span class="badge badge-pending" style="display: none;">Pending</span>
@@ -243,14 +273,14 @@
             </div>
             <div class="feedback-note" id="feedback-bank_statement"></div>
         </div>
-        
-        <!-- Card 4: Identity Proof -->
-        <div class="upload-card" id="card-identity_proof">
+
+        <!-- Card 4: Salary Slip -->
+        <div class="upload-card" id="card-salary_slip">
             <div class="upload-icon">
-                <i class="fas fa-id-card"></i>
+                <i class="fas fa-receipt"></i>
             </div>
-            <h4 style="font-weight: 600; margin-bottom: 4px;">Identity Proof</h4>
-            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">Signatory's Passport, National ID card, Driver's License (PDF, PNG, JPG)</p>
+            <h4 style="font-weight: 600; margin-bottom: 4px;">Salary Slips</h4>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">Latest monthly salary slips for income validation (PDF, Image)</p>
             
             <div class="status-indicator" style="margin-bottom: 15px;">
                 <span class="badge badge-pending" style="display: none;">Pending</span>
@@ -261,9 +291,31 @@
             
             <div class="upload-btn-wrapper">
                 <button class="btn btn-outline btn-sm">Upload File</button>
-                <input type="file" name="file" data-type="identity_proof" onchange="uploadFile(this)">
+                <input type="file" name="file" data-type="salary_slip" onchange="uploadFile(this)">
             </div>
-            <div class="feedback-note" id="feedback-identity_proof"></div>
+            <div class="feedback-note" id="feedback-salary_slip"></div>
+        </div>
+
+        <!-- Card 5: Business Registration -->
+        <div class="upload-card" id="card-business_registration">
+            <div class="upload-icon">
+                <i class="fas fa-briefcase"></i>
+            </div>
+            <h4 style="font-weight: 600; margin-bottom: 4px;">Business Registration</h4>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">GST details, Trade license, or corporate registration (PDF)</p>
+            
+            <div class="status-indicator" style="margin-bottom: 15px;">
+                <span class="badge badge-pending" style="display: none;">Pending</span>
+                <span class="badge badge-approved" style="display: none;">Verified</span>
+                <span class="badge badge-rejected" style="display: none;">Rejected</span>
+                <span class="badge" style="background-color: var(--glass-border); color: var(--text-secondary); display: inline-block;">Not Uploaded</span>
+            </div>
+            
+            <div class="upload-btn-wrapper">
+                <button class="btn btn-outline btn-sm">Upload File</button>
+                <input type="file" name="file" data-type="business_registration" onchange="uploadFile(this)">
+            </div>
+            <div class="feedback-note" id="feedback-business_registration"></div>
         </div>
     </div>
 </div>
@@ -326,37 +378,41 @@
                         if (doc.status === 'Verified') verifiedCount++;
                     });
                     
-                    document.getElementById('verified-docs-count').innerText = `${verifiedCount}/3 Approved`;
-                    document.getElementById('verification-percentage').innerText = `${Math.round((verifiedCount / 3) * 100)}% Verified`;
+                    document.getElementById('verified-docs-count').innerText = `${verifiedCount}/5 Approved`;
+                    document.getElementById('verification-percentage').innerText = `${Math.round((verifiedCount / 5) * 100)}% Verified`;
                     
                     // Reset all cards
-                    const docTypes = ['pan_verification', 'bank_statement', 'identity_proof'];
+                    const docTypes = ['pan_verification', 'aadhaar_verification', 'bank_statement', 'salary_slip', 'business_registration'];
                     docTypes.forEach(type => {
                         const card = document.getElementById(`card-${type}`);
-                        card.className = 'upload-card';
-                        const badges = card.querySelectorAll('.status-indicator .badge');
-                        badges.forEach(b => b.style.display = 'none');
-                        badges[3].style.display = 'inline-block'; // Set to Not Uploaded by default
-                        document.getElementById(`feedback-${type}`).innerText = '';
+                        if (card) {
+                            card.className = 'upload-card';
+                            const badges = card.querySelectorAll('.status-indicator .badge');
+                            badges.forEach(b => b.style.display = 'none');
+                            badges[3].style.display = 'inline-block'; // Set to Not Uploaded by default
+                            document.getElementById(`feedback-${type}`).innerText = '';
+                        }
                     });
                     
                     // Update Upload Cards status
                     docs.forEach(doc => {
                         const card = document.getElementById(`card-${doc.document_type}`);
-                        const badges = card.querySelectorAll('.status-indicator .badge');
-                        badges.forEach(b => b.style.display = 'none');
-                        
-                        if (doc.status === 'Verified') {
-                            card.classList.add('verified');
-                            badges[1].style.display = 'inline-block';
-                        } else if (doc.status === 'Rejected') {
-                            card.classList.add('rejected');
-                            badges[2].style.display = 'inline-block';
-                        } else {
-                            badges[0].style.display = 'inline-block';
+                        if (card) {
+                            const badges = card.querySelectorAll('.status-indicator .badge');
+                            badges.forEach(b => b.style.display = 'none');
+                            
+                            if (doc.status === 'Verified') {
+                                card.classList.add('verified');
+                                badges[1].style.display = 'inline-block';
+                            } else if (doc.status === 'Rejected') {
+                                card.classList.add('rejected');
+                                badges[2].style.display = 'inline-block';
+                            } else {
+                                badges[0].style.display = 'inline-block';
+                            }
+                            
+                            document.getElementById(`feedback-${doc.document_type}`).innerText = doc.verification_notes || '';
                         }
-                        
-                        document.getElementById(`feedback-${doc.document_type}`).innerText = doc.verification_notes || '';
                     });
                     
                     // Populate History Log Table
@@ -398,9 +454,11 @@
 
     function formatDocType(type) {
         switch(type) {
-            case 'pan_verification': return 'PAN Verification';
-            case 'bank_statement': return 'Financial Audit / Bank Statement';
-            case 'identity_proof': return 'Identity Proof';
+            case 'pan_verification': return 'PAN Card';
+            case 'aadhaar_verification': return 'Aadhaar Card';
+            case 'bank_statement': return 'Bank Statement';
+            case 'salary_slip': return 'Salary Slip';
+            case 'business_registration': return 'Business Registration';
             default: return type;
         }
     }

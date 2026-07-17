@@ -1,0 +1,17 @@
+# Local SQLite Database
+backend/database.db
+
+# User Uploaded files
+frontend/static/uploads/*
+!frontend/static/uploads/.gitkeep
+
+# Python temporary files & cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Operating System files
+.DS_Store
+Thumbs.db
+.env
