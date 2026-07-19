@@ -2189,20 +2189,21 @@ def admin_document_action(doc_id):
     conn.close()
     return jsonify({'success': False, 'error': 'Invalid action'}), 400
 
-recent_errors = []
+recent_errors_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'error_log.txt')
 
 @app.errorhandler(Exception)
 def handle_exception(e):
     import traceback
     tb = traceback.format_exc()
-    recent_errors.append({
-        'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'error': str(e),
-        'traceback': tb
-    })
-    if len(recent_errors) > 20:
-        recent_errors.pop(0)
+    error_msg = f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {e}\n{tb}\n"
     
+    # Append to log file
+    try:
+        with open(recent_errors_file, 'a', encoding='utf-8') as f:
+            f.write(error_msg)
+    except Exception as io_err:
+        print(f"Failed to write to error log file: {io_err}", flush=True)
+        
     print(f"CRITICAL EXCEPTION TRIGGERED: {e}\n{tb}", flush=True)
     
     if request.path.startswith('/api/') or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
@@ -2228,18 +2229,37 @@ def handle_exception(e):
 
 @app.route('/dev/users')
 def dev_users():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, username, email, phone, role, firebase_uid, created_at FROM users ORDER BY id DESC")
-    users = [dict(row) for row in cursor.fetchall()]
-    cursor.execute("SELECT id, email, otp, expires_at, created_at FROM otps ORDER BY id DESC")
-    otps = [dict(row) for row in cursor.fetchall()]
-    conn.close()
-    return jsonify({'users': users, 'otps': otps})
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, username, email, phone, role, firebase_uid, created_at FROM users ORDER BY id DESC")
+        users = [dict(row) for row in cursor.fetchall()]
+        cursor.execute("SELECT id, email, otp, expires_at, created_at FROM otps ORDER BY id DESC")
+        otps = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        return jsonify({'users': users, 'otps': otps})
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        # Log to file
+        try:
+            with open(recent_errors_file, 'a', encoding='utf-8') as f:
+                f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] dev_users error: {e}\n{tb}\n")
+        except Exception:
+            pass
+        raise e
 
 @app.route('/dev/errors')
 def dev_errors():
-    return jsonify(recent_errors)
+    logs = ""
+    if os.path.exists(recent_errors_file):
+        try:
+            with open(recent_errors_file, 'r', encoding='utf-8') as f:
+                logs = f.read()
+        except Exception as e:
+            logs = f"Failed to read logs: {e}"
+    return f"<pre>{logs}</pre>"
+
 
 @app.route('/dev/get-otp/<email>')
 def dev_get_otp(email):
