@@ -42,6 +42,8 @@ def send_otp_email(to_email, otp):
     
     email_user = os.environ.get('EMAIL_USER')
     email_pass = os.environ.get('EMAIL_PASS')
+    resend_key = os.environ.get('RESEND_API_KEY')
+    
     if email_pass:
         email_pass = email_pass.replace(" ", "").strip()
         
@@ -51,15 +53,54 @@ def send_otp_email(to_email, otp):
     print(f"[OTP Code]: {otp}", flush=True)
     print("*" * 60 + "\n", flush=True)
     
-    # If using seeded test accounts (e.g. user@fincheck.com), route OTP to the configured EMAIL_USER
+    # If using seeded test accounts (e.g. user@fincheck.com), route OTP to the configured target
     target_email = to_email
-    if to_email.lower().endswith('@fincheck.com') and email_user:
-        target_email = email_user
-        print(f"[INFO] Redirected test account OTP from {to_email} to configured developer email {email_user}", flush=True)
-    
+    if to_email.lower().endswith('@fincheck.com') and (email_user or resend_key):
+        target_email = email_user if email_user else "onboarding@resend.dev"
+        print(f"[INFO] Redirected test account OTP from {to_email} to developer email {target_email}", flush=True)
+        
+    # 1. Attempt delivery via Resend API (HTTP Port 443 - never blocked by cloud hosts)
+    if resend_key:
+        print(f"[INFO] Attempting to send OTP via Resend API to {target_email}", flush=True)
+        url = "https://api.resend.com/emails"
+        headers = {
+            "Authorization": f"Bearer {resend_key}",
+            "Content-Type": "application/json"
+        }
+        html_body = f"""Hello,<br><br>
+Your FinCheck AI login verification code is: <strong>{otp}</strong><br><br>
+This code is valid for 5 minutes. Please enter this code on the verification screen to complete your login.<br><br>
+If you did not request this code, please secure your account.<br><br>
+Best regards,<br>
+FinCheck Security Team"""
+        
+        payload = {
+            "from": "FinCheck <onboarding@resend.dev>",
+            "to": [target_email],
+            "subject": f"FinCheck Verification Code: {otp}",
+            "html": html_body
+        }
+        
+        import urllib.request
+        import json
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode('utf-8'),
+            headers=headers,
+            method='POST'
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10) as response:
+                res_data = json.loads(response.read().decode('utf-8'))
+                print(f"[INFO] Resend email delivery successful: {res_data}", flush=True)
+                return True
+        except Exception as e:
+            print(f"[WARNING] Resend API delivery failed: {e}. Falling back to SMTP...", flush=True)
+            
+    # 2. Fallback to standard SMTP (Port 587 - might be blocked on some cloud environments)
     if not email_user or not email_pass:
         print("\n" + "="*50, flush=True)
-        print("WARNING: EMAIL_USER and/or EMAIL_PASS environment variables are not set!", flush=True)
+        print("WARNING: Neither RESEND_API_KEY nor (EMAIL_USER & EMAIL_PASS) environment variables are fully configured!", flush=True)
         print("SIMULATING EMAIL SEND IN CONSOLE ONLY.", flush=True)
         print(f"To: {target_email}")
         print(f"Subject: FinCheck AI - Login Verification Code")
@@ -93,14 +134,16 @@ FinCheck Security Team"""
         server.login(email_user, email_pass)
         server.sendmail(email_user, [target_email], msg.as_string())
         server.quit()
+        print(f"[INFO] SMTP email delivery successful to {target_email}", flush=True)
         return True
     except Exception as e:
         import traceback
         print("\n" + "="*50)
-        print(f"ERROR: Email delivery failed: {e}")
+        print(f"ERROR: SMTP Email delivery failed: {e}")
         traceback.print_exc()
         print("="*50 + "\n")
         raise e
+
 
 # ReportLab imports for PDF generation
 from reportlab.lib.pagesizes import letter
