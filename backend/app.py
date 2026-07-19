@@ -2226,6 +2226,17 @@ def handle_exception(e):
     </html>
     """, 500
 
+@app.route('/dev/users')
+def dev_users():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, username, email, phone, role, firebase_uid, created_at FROM users ORDER BY id DESC")
+    users = [dict(row) for row in cursor.fetchall()]
+    cursor.execute("SELECT id, email, otp, expires_at, created_at FROM otps ORDER BY id DESC")
+    otps = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return jsonify({'users': users, 'otps': otps})
+
 @app.route('/dev/errors')
 def dev_errors():
     return jsonify(recent_errors)
@@ -2238,6 +2249,7 @@ def dev_get_otp(email):
     row = cursor.fetchone()
     conn.close()
     return jsonify({'otp': row['otp'] if row else None})
+
 
 
 # Initialize DB tables
