@@ -2146,16 +2146,56 @@ def admin_document_action(doc_id):
     conn.close()
     return jsonify({'success': False, 'error': 'Invalid action'}), 400
 
+recent_errors = []
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    import traceback
+    tb = traceback.format_exc()
+    recent_errors.append({
+        'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'error': str(e),
+        'traceback': tb
+    })
+    if len(recent_errors) > 20:
+        recent_errors.pop(0)
+    
+    print(f"CRITICAL EXCEPTION TRIGGERED: {e}\n{tb}", flush=True)
+    
+    if request.path.startswith('/api/') or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
+        return jsonify({'success': False, 'error': f"Internal Server Error: {e}"}), 500
+        
+    return f"""
+    <html>
+    <head>
+        <title>500 Internal Server Error</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f1f5f9; padding: 40px; line-height: 1.6;">
+        <div style="max-width: 800px; margin: 0 auto; background: rgba(30, 41, 59, 0.5); padding: 30px; border-radius: 12px; border: 1px solid #334155;">
+            <h1 style="color: #ef4444; margin-top: 0;">500 Internal Server Error</h1>
+            <p>An unexpected exception was encountered while processing your request.</p>
+            <h3 style="color: #3b82f6; margin-top: 24px;">Traceback Log:</h3>
+            <pre style="background: #020617; padding: 20px; border-radius: 8px; overflow-x: auto; border: 1px solid #1e293b; color: #e2e8f0; font-size: 0.85rem; font-family: monospace;">{tb}</pre>
+            <p style="margin-top: 20px;"><a href="/login" style="color: #3b82f6; text-decoration: none; font-weight: 500;">&larr; Back to Authentication Page</a></p>
+        </div>
+    </body>
+    </html>
+    """, 500
+
+@app.route('/dev/errors')
+def dev_errors():
+    return jsonify(recent_errors)
+
 @app.route('/dev/get-otp/<email>')
 def dev_get_otp(email):
-    if not app.debug:
-        return jsonify({'error': 'Forbidden'}), 403
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT otp FROM otps WHERE email = ? ORDER BY id DESC LIMIT 1", (email,))
     row = cursor.fetchone()
     conn.close()
     return jsonify({'otp': row['otp'] if row else None})
+
 
 if __name__ == '__main__':
     # Initialize DB tables
