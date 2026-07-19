@@ -2193,6 +2193,10 @@ recent_errors_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'e
 
 @app.errorhandler(Exception)
 def handle_exception(e):
+    from werkzeug.exceptions import HTTPException
+    if isinstance(e, HTTPException):
+        return e
+        
     import traceback
     tb = traceback.format_exc()
     error_msg = f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {e}\n{tb}\n"
