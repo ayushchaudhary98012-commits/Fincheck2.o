@@ -36,7 +36,7 @@ class FinCheckTestCase(unittest.TestCase):
         conn.close()
         
     def register_and_login(self, username, password, email, phone, role='applicant'):
-        # 1. Register
+        # 1. Register (which triggers pending registration and OTP generation)
         self.client.post('/login', data={
             'action': 'register',
             'username': username,
@@ -47,39 +47,29 @@ class FinCheckTestCase(unittest.TestCase):
             'confirm_password': password
         }, follow_redirects=True)
         
-        # 2. Login
-        return self.login_existing_user(username, password)
-
-    def login_existing_user(self, username, password):
-        # 1. Submit username/password to trigger OTP generation
-        self.client.post('/login', data={
-            'action': 'login',
-            'username': username,
-            'password': password
-        }, follow_redirects=True)
-        
         # 2. Retrieve the generated OTP from SQLite database
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT email FROM users WHERE username = ?", (username,))
-        user_row = cursor.fetchone()
-        if not user_row:
-            conn.close()
-            raise ValueError(f"Test user {username} not found")
-        email = user_row['email']
-        
         cursor.execute("SELECT otp FROM otps WHERE email = ?", (email,))
         otp_row = cursor.fetchone()
         conn.close()
         
         if not otp_row:
-            raise ValueError(f"No OTP generated for {username} (email: {email})")
+            raise ValueError(f"No OTP generated for registration of {username} (email: {email})")
         otp = otp_row['otp']
         
-        # 3. Submit OTP code to verify
+        # 3. Submit OTP code to verify and finalize registration/login
         return self.client.post('/api/auth/verify-otp', data={
             'email': email,
             'otp': otp
+        }, follow_redirects=True)
+
+    def login_existing_user(self, username, password):
+        # Direct login with username/password
+        return self.client.post('/login', data={
+            'action': 'login',
+            'username': username,
+            'password': password
         }, follow_redirects=True)
         
     def tearDown(self):
@@ -103,21 +93,8 @@ class FinCheckTestCase(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertIn(b'Login', res.data)
         
-        # Test dynamic registration
-        res = self.client.post('/login', data={
-            'action': 'register',
-            'username': 'test_applicant',
-            'email': 'applicant@test.com',
-            'phone': '+2222222222',
-            'role': 'applicant',
-            'password': 'testpassword',
-            'confirm_password': 'testpassword'
-        }, follow_redirects=True)
-        self.assertEqual(res.status_code, 200)
-        self.assertIn(b'Registration successful! Please log in to access your account.', res.data)
-        
-        # Login
-        res = self.login_existing_user('test_applicant', 'testpassword')
+        # Test dynamic registration (requires OTP verification)
+        res = self.register_and_login('test_applicant', 'testpassword', 'applicant@test.com', '+2222222222')
         self.assertEqual(res.status_code, 200)
         self.assertIn(b'Borrower Dashboard', res.data) # should land on applicant dashboard
         
@@ -369,35 +346,141 @@ class FinCheckTestCase(unittest.TestCase):
         self.assertEqual(data['score'], 45)
 
     def test_otp_verification_flow(self):
-        # 1. Verify invalid OTP returns error
+        # 1. Trigger registration to generate OTP
+        self.client.post('/login', data={
+            'action': 'register',
+            'username': 'test_registration_flow',
+            'email': 'reg_flow@test.com',
+            'phone': '1234567890',
+            'role': 'applicant',
+            'password': 'password123',
+            'confirm_password': 'password123'
+        })
+        
+        # 2. Verify invalid OTP returns error
         res = self.client.post('/api/auth/verify-otp', data={
-            'email': 'user@fincheck.com',
+            'email': 'reg_flow@test.com',
             'otp': '999999'
         }, follow_redirects=True)
         self.assertIn(b'Invalid OTP', res.data)
         
-        # 2. Trigger password check to generate OTP
-        self.client.post('/login', data={
-            'action': 'login',
-            'username': 'user',
-            'password': 'user123'
-        })
-        
         # 3. Retrieve the generated OTP from DB
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT otp FROM otps WHERE email = 'user@fincheck.com'")
+        cursor.execute("SELECT otp FROM otps WHERE email = 'reg_flow@test.com'")
         otp_row = cursor.fetchone()
         conn.close()
         self.assertIsNotNone(otp_row)
         otp = otp_row['otp']
         
-        # 4. Verify correct OTP works
+        # 4. Verify correct OTP works, creating the user and logging in
         res = self.client.post('/api/auth/verify-otp', data={
-            'email': 'user@fincheck.com',
+            'email': 'reg_flow@test.com',
             'otp': otp
         }, follow_redirects=True)
         self.assertIn(b'Logged in successfully', res.data)
+
+    def test_notifications_flow(self):
+        # 1. Register and login a user
+        self.client.post('/login', data={
+            'action': 'register',
+            'username': 'notif_user',
+            'email': 'notif_user@test.com',
+            'phone': '1234567890',
+            'role': 'applicant',
+            'password': 'password123',
+            'confirm_password': 'password123'
+        })
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT otp FROM otps WHERE email = 'notif_user@test.com'")
+        otp = cursor.fetchone()['otp']
+        conn.close()
+        
+        self.client.post('/api/auth/verify-otp', data={
+            'email': 'notif_user@test.com',
+            'otp': otp
+        }, follow_redirects=True)
+        
+        # 2. Submit a loan application
+        self.client.post('/apply', data={
+            'full_name': 'Notif User',
+            'age': '30',
+            'gender': 'Male',
+            'email': 'notif_user@test.com',
+            'phone': '1234567890',
+            'employment_type': 'Salaried',
+            'profession': 'Developer',
+            'monthly_income': '15000',
+            'existing_emi': '1000',
+            'loan_type': 'Personal',
+            'loan_amount': '500000',
+            'loan_tenure': '24',
+            'guarantor_name': 'None',
+            'guarantor_income': '0',
+            'existing_debts': '0',
+            'credit_history': '1'
+        })
+        
+        # 3. Retrieve notifications and verify submission notification
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM notifications")
+        notifs = cursor.fetchall()
+        conn.close()
+        
+        self.assertGreater(len(notifs), 0)
+        self.assertEqual(notifs[0]['title'], "Loan Application Submitted")
+        self.assertEqual(notifs[0]['type'], "info")
+        
+        # Get application ID
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM applications WHERE email = 'notif_user@test.com'")
+        app_id = cursor.fetchone()['id']
+        conn.close()
+        
+        # 4. Update status as admin and verify notification
+        # Login as admin
+        self.client.get('/logout', follow_redirects=True)
+        self.client.post('/login', data={
+            'action': 'login',
+            'username': 'admin@fincheck.com',
+            'password': 'admin123'
+        }, follow_redirects=True)
+        
+        self.client.post(f'/admin/applications/{app_id}/status', data={
+            'status': 'Approved'
+        }, follow_redirects=True)
+        
+        # Check database for approval notification
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM notifications WHERE type = 'success'")
+        admin_notifs = cursor.fetchall()
+        conn.close()
+        self.assertEqual(len(admin_notifs), 1)
+        self.assertIn("Approved", admin_notifs[0]['title'])
+        
+        # 5. Clear notifications and verify is_read
+        # Logout admin and login user
+        self.client.get('/logout', follow_redirects=True)
+        self.client.post('/login', data={
+            'action': 'login',
+            'username': 'notif_user@test.com',
+            'password': 'password123'
+        }, follow_redirects=True)
+        
+        res = self.client.post('/api/notifications/clear', follow_redirects=True)
+        self.assertEqual(res.status_code, 200)
+        
+        # Verify in database
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM notifications WHERE is_read = 0")
+        unread_count = cursor.fetchone()[0]
+        conn.close()
+        self.assertEqual(unread_count, 0)
 
 if __name__ == '__main__':
     unittest.main()

@@ -54,7 +54,9 @@
             <div class="notification-dropdown-wrap">
                 <button id="notification-bell" class="notification-btn" title="Notifications">
                     <i class="fas fa-bell"></i>
-                    <span class="notification-badge">3</span>
+                    {% if unread_notifications_count > 0 %}
+                    <span class="notification-badge">{{ unread_notifications_count }}</span>
+                    {% endif %}
                 </button>
                 <div class="notification-menu glass-panel" id="notification-menu">
                     <div class="notification-header">
@@ -62,44 +64,27 @@
                         <span class="mark-all-read" id="clear-notifications">Clear</span>
                     </div>
                     <ul class="notification-list">
-                        {% if session.get('role') == 'lender' %}
-                            <li class="notification-item unread">
-                                <i class="fas fa-user-check text-primary"></i>
-                                <div>
-                                    <p>New borrower matched for ₹2 Lakhs</p>
-                                    <small>5 mins ago</small>
-                                </div>
-                            </li>
-                            <li class="notification-item unread">
-                                <i class="fas fa-cog text-info"></i>
-                                <div>
-                                    <p>Lending preferences initialized</p>
-                                    <small>10 mins ago</small>
-                                </div>
-                            </li>
+                        {% if real_notifications %}
+                            {% for notif in real_notifications %}
+                                <li class="notification-item {% if notif.is_read == 0 %}unread{% endif %}" data-id="{{ notif.id }}">
+                                    {% if notif.type == 'success' %}
+                                        <i class="fas fa-check-circle text-success"></i>
+                                    {% elif notif.type == 'danger' %}
+                                        <i class="fas fa-times-circle text-danger"></i>
+                                    {% elif notif.type == 'warning' %}
+                                        <i class="fas fa-exclamation-triangle text-warning"></i>
+                                    {% else %}
+                                        <i class="fas fa-info-circle text-info"></i>
+                                    {% endif %}
+                                    <div>
+                                        <p>{{ notif.message }}</p>
+                                        <small>{{ notif.created_at[:16] }}</small>
+                                    </div>
+                                </li>
+                            {% endfor %}
                         {% else %}
-                            <li class="notification-item unread">
-                                <i class="fas fa-shield-heart text-success"></i>
-                                <div>
-                                    <p>Document verified: PAN Card (+15 points)</p>
-                                    <small>15 mins ago</small>
-                                </div>
-                            </li>
-                            <li class="notification-item unread">
-                                <i class="fas fa-handshake text-primary"></i>
-                                <div>
-                                    <p>New lender matched with 96% compatibility</p>
-                                    <small>1 hour ago</small>
-                                </div>
-                            </li>
+                            <li style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem;">No new notifications</li>
                         {% endif %}
-                        <li class="notification-item">
-                            <i class="fas fa-shield text-warning"></i>
-                            <div>
-                                <p>AI Underwriting security keys verified</p>
-                                <small>Yesterday</small>
-                            </div>
-                        </li>
                     </ul>
                 </div>
             </div>
@@ -168,6 +153,10 @@
 
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Firebase SDK Compat -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+
     <!-- Core JS -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     {% block scripts %}{% endblock %}
@@ -273,11 +262,20 @@
             const clearNotif = document.getElementById('clear-notifications');
             if (clearNotif) {
                 clearNotif.addEventListener('click', () => {
-                    document.querySelectorAll('.notification-item').forEach(item => item.remove());
-                    const badge = document.querySelector('.notification-badge');
-                    if (badge) badge.remove();
-                    const list = document.querySelector('.notification-list');
-                    if (list) list.innerHTML = '<li style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem;">No new notifications</li>';
+                    fetch('/api/notifications/clear', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            document.querySelectorAll('.notification-item').forEach(item => item.remove());
+                            const badge = document.querySelector('.notification-badge');
+                            if (badge) badge.remove();
+                            const list = document.querySelector('.notification-list');
+                            if (list) list.innerHTML = '<li style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem;">No new notifications</li>';
+                        }
+                    });
                 });
             }
         });

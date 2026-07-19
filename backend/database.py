@@ -28,6 +28,7 @@ def init_db():
             role TEXT NOT NULL DEFAULT 'applicant',
             otp_code TEXT,
             otp_expiry TIMESTAMP,
+            firebase_uid TEXT UNIQUE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -43,6 +44,10 @@ def init_db():
         pass
     try:
         cursor.execute("ALTER TABLE users ADD COLUMN otp_expiry TIMESTAMP")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN firebase_uid TEXT")
     except sqlite3.OperationalError:
         pass
     
@@ -130,6 +135,20 @@ def init_db():
             otp TEXT NOT NULL,
             expires_at TIMESTAMP NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # Create Notifications table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            message TEXT NOT NULL,
+            type TEXT NOT NULL,
+            is_read INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
     ''')
 

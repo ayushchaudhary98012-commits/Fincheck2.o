@@ -169,8 +169,13 @@ function initMultiStepForm() {
     });
     
     form.addEventListener('submit', (e) => {
-        if (!validateStep(currentStepIndex)) {
-            e.preventDefault();
+        // Validate all steps from first to last to ensure complete data
+        for (let i = 0; i < steps.length; i++) {
+            if (!validateStep(i)) {
+                e.preventDefault();
+                showStep(i); // Redirect the user to the invalid step to correct fields
+                return;
+            }
         }
     });
 }

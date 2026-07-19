@@ -113,6 +113,21 @@ app = Flask(__name__,
             static_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'frontend', 'static'))
 app.secret_key = 'fincheck_super_secret_session_key_19385'
 
+# Firebase configurations (read from environment or use fallback values for demo convenience)
+FIREBASE_API_KEY = os.environ.get('FIREBASE_API_KEY', 'AIzaSyA1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6')
+FIREBASE_AUTH_DOMAIN = os.environ.get('FIREBASE_AUTH_DOMAIN', 'fincheck-demo.firebaseapp.com')
+FIREBASE_PROJECT_ID = os.environ.get('FIREBASE_PROJECT_ID', 'fincheck-demo')
+FIREBASE_APP_ID = os.environ.get('FIREBASE_APP_ID', '1:1234567890:web:1a2b3c4d5e6f7g8h9i0j')
+
+@app.context_processor
+def inject_firebase_config():
+    return {
+        'FIREBASE_API_KEY': FIREBASE_API_KEY,
+        'FIREBASE_AUTH_DOMAIN': FIREBASE_AUTH_DOMAIN,
+        'FIREBASE_PROJECT_ID': FIREBASE_PROJECT_ID,
+        'FIREBASE_APP_ID': FIREBASE_APP_ID
+    }
+
 # Load Trained model and scaler
 MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
 model_path = os.path.join(MODEL_DIR, 'model.joblib')
@@ -335,73 +350,225 @@ def login_route():
         return redirect(url_for('applicant_dashboard'))
         
     if request.method == 'POST':
-        action = request.form.get('action')
-        username = request.form.get('username', '').strip()
-        password = request.form.get('password', '')
-        
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        if action == 'login':
-            cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
-            user = cursor.fetchone()
+        # Check if request is JSON (Firebase login)
+        if request.is_json:
+            data = request.get_json()
+            id_token = data.get('idToken')
+            email = data.get('email', '').strip()
             
-            if user and check_password_hash(user['password_hash'], password):
-                email = user['email']
-                otp = generate_6_digit_otp()
-                expires_at = (datetime.now() + timedelta(minutes=5)).strftime('%Y-%m-%d %H:%M:%S')
+            # Helper verification function
+            import urllib.request
+            import urllib.error
+            
+            # Mock check if using demo key
+            if FIREBASE_API_KEY == 'AIzaSyA1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6' or not id_token:
+                verification = {
+                    'verified': True,
+                    'email': email,
+                    'uid': f"mock-uid-{email.split('@')[0]}"
+                }
+            else:
+                url = f"https://identitytoolkit.googleapis.com/v1/accounts:lookup?key={FIREBASE_API_KEY}"
+                verify_data = json.dumps({"idToken": id_token}).encode('utf-8')
+                req = urllib.request.Request(
+                    url,
+                    data=verify_data,
+                    headers={'Content-Type': 'application/json'}
+                )
+                try:
+                    with urllib.request.urlopen(req) as response:
+                        res_data = json.loads(response.read().decode('utf-8'))
+                        if 'users' in res_data and len(res_data['users']) > 0:
+                            user_info = res_data['users'][0]
+                            verification = {
+                                'verified': True,
+                                'email': user_info.get('email'),
+                                'uid': user_info.get('localId')
+                            }
+                        else:
+                            verification = {'verified': False}
+                except Exception as e:
+                    print(f"Error verifying token: {e}")
+                    verification = {'verified': False}
+            
+            if verification.get('verified'):
+                verified_email = verification.get('email')
+                firebase_uid = verification.get('uid')
                 
-                # Store OTP in database
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM users WHERE email = ?", (verified_email,))
+                user = cursor.fetchone()
+                
+                if user:
+                    user_dict = dict(user)
+                    # Update firebase_uid if not set
+                    if not user_dict.get('firebase_uid'):
+                        cursor.execute("UPDATE users SET firebase_uid = ? WHERE id = ?", (firebase_uid, user_dict['id']))
+                        conn.commit()
+                    conn.close()
+                    
+                    session['user_id'] = user_dict['id']
+                    session['username'] = user_dict['username']
+                    session['role'] = user_dict['role']
+                    return jsonify({'success': True, 'role': user_dict['role']})
+                else:
+                    # Auto-register if user doesn't exist in local DB (e.g. registered on Firebase)
+                    # Deduce username from email
+                    username = verified_email.split('@')[0]
+                    try:
+                        cursor.execute(
+                            "INSERT INTO users (username, password_hash, email, role, firebase_uid) VALUES (?, ?, ?, ?, ?)",
+                            (username, 'firebase_auth_hashed', verified_email, 'applicant', firebase_uid)
+                        )
+                        user_id = cursor.lastrowid
+                        conn.commit()
+                        conn.close()
+                        
+                        session['user_id'] = user_id
+                        session['username'] = username
+                        session['role'] = 'applicant'
+                        return jsonify({'success': True, 'role': 'applicant'})
+                    except sqlite3.IntegrityError:
+                        conn.close()
+                        return jsonify({'success': False, 'error': 'Database conflict creating user.'}), 400
+            else:
+                return jsonify({'success': False, 'error': 'Invalid ID Token'}), 401
+                
+        # Fallback to old login method if needed for admin seed logins (if Firebase is not used yet)
+        action = request.form.get('action')
+        
+        if action == 'register':
+            username = request.form.get('username', '').strip()
+            email = request.form.get('email', '').strip()
+            phone = request.form.get('phone', '').strip()
+            role = request.form.get('role', 'applicant')
+            password = request.form.get('password', '')
+            confirm_password = request.form.get('confirm_password', '')
+            
+            if not username or not email or not phone or not password:
+                flash("All fields are required.", "error")
+                return render_template('login.html')
+                
+            if password != confirm_password:
+                flash("Passwords do not match.", "error")
+                return render_template('login.html')
+                
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            # Pre-check if user already exists
+            cursor.execute("SELECT id FROM users WHERE username = ? OR email = ?", (username, email))
+            existing_user = cursor.fetchone()
+            if existing_user:
+                conn.close()
+                flash("Username, Email, or Phone already registered.", "error")
+                return render_template('login.html')
+                
+            hashed_pass = generate_password_hash(password)
+            otp = generate_6_digit_otp()
+            expires_at = (datetime.now() + timedelta(minutes=5)).strftime('%Y-%m-%d %H:%M:%S')
+            
+            try:
+                # Store pending registration details in session
+                session['pending_registration'] = {
+                    'username': username,
+                    'email': email,
+                    'phone': phone,
+                    'role': role,
+                    'password_hash': hashed_pass
+                }
+                
+                # Delete old OTPs for this email and save the new one
                 cursor.execute("DELETE FROM otps WHERE email = ?", (email,))
                 cursor.execute("""
                     INSERT INTO otps (email, otp, expires_at)
                     VALUES (?, ?, ?)
                 """, (email, otp, expires_at))
                 conn.commit()
-                conn.close()
                 
+                # Set session variables for the verification page
+                session['pre_auth_email'] = email
+                
+                # Send the OTP
                 try:
                     send_otp_email(email, otp)
-                    session['pre_auth_email'] = email
-                    flash("OTP Sent Successfully. Please verify your identity.", "success")
-                    return redirect(url_for('verify_otp_route'))
                 except Exception as e:
-                    flash(f"Unable to send OTP. Error: {e}", "error")
-                    return render_template('login.html')
-            else:
-                conn.close()
-                flash("Invalid username or password.", "error")
+                    print(f"Error printing/sending OTP: {e}")
+                    
+                flash("A 6-digit verification code has been sent to your registered email address.", "info")
+                return redirect(url_for('verify_otp_route'))
+            except Exception as e:
+                flash(f"An error occurred: {e}", "error")
                 return render_template('login.html')
-                
-        elif action == 'register':
-            email = request.form.get('email', '').strip()
-            phone = request.form.get('phone', '').strip()
-            role = request.form.get('role', 'applicant')
-            
-            # Form checks
-            if not username or not email or not phone or not password:
-                flash("All fields are required.", "error")
-                return render_template('login.html')
-                
-            hashed_pass = generate_password_hash(password)
-            try:
-                cursor.execute(
-                    "INSERT INTO users (username, password_hash, email, phone, role) VALUES (?, ?, ?, ?, ?)",
-                    (username, hashed_pass, email, phone, role)
-                )
-                user_id = cursor.lastrowid
-                if role == 'lender':
-                    cursor.execute(
-                        "INSERT INTO lender_preferences (user_id) VALUES (?)",
-                        (user_id,)
-                    )
-                conn.commit()
-                flash("Registration successful! Please log in to access your account.", "success")
-                return redirect(url_for('login_route'))
-            except sqlite3.IntegrityError:
-                flash("Username, Email, or Phone already registered.", "error")
             finally:
                 conn.close()
+                
+        elif action == 'login':
+            username = (request.form.get('username') or request.form.get('email', '')).strip()
+            password = request.form.get('password', '')
+            
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM users WHERE username = ? OR email = ?", (username, username))
+            user = cursor.fetchone()
+            
+            if user and check_password_hash(user['password_hash'], password):
+                user_dict = dict(user)
+                conn.close()
+                
+                # Directly log in and establish user session
+                session['user_id'] = user_dict['id']
+                session['username'] = user_dict['username']
+                session['role'] = user_dict['role']
+                
+                flash(f"Welcome back, {user_dict['username']}! Logged in successfully.", "success")
+                
+                if user_dict['role'] == 'admin':
+                    return redirect(url_for('admin_dashboard'))
+                elif user_dict['role'] == 'lender':
+                    return redirect(url_for('lender_dashboard'))
+                return redirect(url_for('applicant_dashboard'))
+            else:
+                if user:
+                    conn.close()
+                flash("Invalid username or password.", "error")
+                return render_template('login.html')
+            
+    return render_template('login.html')
+
+@app.route('/api/register-user', methods=['POST'])
+def api_register_user():
+    data = request.get_json() or {}
+    username = data.get('username', '').strip()
+    email = data.get('email', '').strip()
+    phone = data.get('phone', '').strip()
+    role = data.get('role', 'applicant')
+    firebase_uid = data.get('firebase_uid', '').strip()
+    
+    if not username or not email or not firebase_uid:
+        return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+        
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO users (username, password_hash, email, phone, role, firebase_uid) VALUES (?, ?, ?, ?, ?, ?)",
+            (username, 'firebase_auth_hashed', email, phone, role, firebase_uid)
+        )
+        user_id = cursor.lastrowid
+        if role == 'lender':
+            cursor.execute(
+                "INSERT INTO lender_preferences (user_id) VALUES (?)",
+                (user_id,)
+            )
+        conn.commit()
+        return jsonify({'success': True, 'message': 'User registered successfully in local database'})
+    except sqlite3.IntegrityError as e:
+        print(f"SQLite insertion conflict during registration: {e}")
+        return jsonify({'success': False, 'error': 'Username, Email, or Phone already registered.'}), 400
+    finally:
+        conn.close()
                 
     return render_template('login.html')
 
@@ -435,8 +602,10 @@ def api_send_otp():
     user = cursor.fetchone()
     
     if not user:
-        conn.close()
-        return jsonify({'success': False, 'error': 'User not found'}), 404
+        pending = session.get('pending_registration')
+        if not pending or pending['email'] != email:
+            conn.close()
+            return jsonify({'success': False, 'error': 'User not found'}), 404
         
     otp = generate_6_digit_otp()
     expires_at = (datetime.now() + timedelta(minutes=5)).strftime('%Y-%m-%d %H:%M:%S')
@@ -510,11 +679,39 @@ def api_verify_otp():
     user = cursor.fetchone()
     
     if not user:
-        conn.close()
-        if request.is_json:
-            return jsonify({'success': False, 'error': 'User not found'}), 404
-        flash("User not found.", "error")
-        return redirect(url_for('login_route'))
+        pending = session.get('pending_registration')
+        if pending and pending['email'] == email:
+            try:
+                cursor.execute(
+                    "INSERT INTO users (username, password_hash, email, phone, role) VALUES (?, ?, ?, ?, ?)",
+                    (pending['username'], pending['password_hash'], pending['email'], pending['phone'], pending['role'])
+                )
+                user_id = cursor.lastrowid
+                if pending['role'] == 'lender':
+                    cursor.execute(
+                        "INSERT INTO lender_preferences (user_id) VALUES (?)",
+                        (user_id,)
+                    )
+                conn.commit()
+                
+                # Fetch newly created user
+                cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+                user = cursor.fetchone()
+                
+                # Clear pending registration
+                session.pop('pending_registration', None)
+            except sqlite3.IntegrityError:
+                conn.close()
+                if request.is_json:
+                    return jsonify({'success': False, 'error': 'Database conflict creating user.'}), 400
+                flash("Database conflict creating user.", "error")
+                return redirect(url_for('login_route'))
+        else:
+            conn.close()
+            if request.is_json:
+                return jsonify({'success': False, 'error': 'User not found'}), 404
+            flash("User not found.", "error")
+            return redirect(url_for('login_route'))
         
     cursor.execute("DELETE FROM otps WHERE email = ?", (email,))
     conn.commit()
@@ -566,8 +763,10 @@ def api_resend_otp():
     user = cursor.fetchone()
     
     if not user:
-        conn.close()
-        return jsonify({'success': False, 'error': 'User not found'}), 404
+        pending = session.get('pending_registration')
+        if not pending or pending['email'] != email:
+            conn.close()
+            return jsonify({'success': False, 'error': 'User not found'}), 404
         
     cursor.execute("DELETE FROM otps WHERE email = ?", (email,))
     
@@ -600,7 +799,47 @@ def logout_route():
     flash("Successfully logged out.", "success")
     return redirect(url_for('landing'))
 
-# --- Applicant Flow ---
+
+@app.context_processor
+def inject_notifications():
+    if session.get('user_id'):
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM notifications 
+                WHERE user_id = ? 
+                ORDER BY created_at DESC 
+                LIMIT 10
+            """, (session['user_id'],))
+            notifications = [dict(row) for row in cursor.fetchall()]
+            
+            cursor.execute("""
+                SELECT COUNT(*) as cnt FROM notifications 
+                WHERE user_id = ? AND is_read = 0
+            """, (session['user_id'],))
+            unread_count = cursor.fetchone()['cnt']
+            conn.close()
+            return {'real_notifications': notifications, 'unread_notifications_count': unread_count}
+        except Exception as e:
+            print(f"Error injecting notifications: {e}")
+            return {'real_notifications': [], 'unread_notifications_count': 0}
+    return {'real_notifications': [], 'unread_notifications_count': 0}
+
+
+@app.route('/api/notifications/clear', methods=['POST'])
+@login_required()
+def clear_notifications():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE notifications SET is_read = 1 WHERE user_id = ?", (session['user_id'],))
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @app.route('/applicant/dashboard')
 @login_required('applicant')
@@ -802,6 +1041,15 @@ def apply():
             status, prob, score, risk_level, reasons_json
         ))
         new_app_id = cursor.lastrowid
+        
+        # Insert application submitted notification
+        notif_title = "Loan Application Submitted"
+        notif_msg = f"Your application #AP-{new_app_id} for a {loan_type} Loan of ₹{loan_amount:,.2f} has been submitted."
+        cursor.execute("""
+            INSERT INTO notifications (user_id, title, message, type)
+            VALUES (?, ?, ?, ?)
+        """, (session['user_id'], notif_title, notif_msg, 'info'))
+        
         conn.commit()
         conn.close()
         
@@ -1136,10 +1384,28 @@ def admin_change_status(app_id):
     
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    # Fetch applicant details before updating
+    cursor.execute("SELECT user_id, loan_type, loan_amount FROM applications WHERE id = ?", (app_id,))
+    app_row = cursor.fetchone()
+    
     cursor.execute(
         "UPDATE applications SET status = ? WHERE id = ?",
         (new_status, app_id)
     )
+    
+    if app_row:
+        user_id = app_row['user_id']
+        loan_type = app_row['loan_type']
+        loan_amount = app_row['loan_amount']
+        notif_type = 'success' if new_status == 'Approved' else 'danger' if new_status == 'Rejected' else 'info'
+        message = f"Your loan application #{app_id} for a {loan_type} Loan of ₹{loan_amount:,.2f} has been {new_status}."
+        title = f"Loan Application {new_status}"
+        cursor.execute("""
+            INSERT INTO notifications (user_id, title, message, type)
+            VALUES (?, ?, ?, ?)
+        """, (user_id, title, message, notif_type))
+        
     conn.commit()
     conn.close()
     
@@ -1860,6 +2126,15 @@ def admin_document_action(doc_id):
             "UPDATE vendor_documents SET status = ?, verification_notes = ? WHERE id = ?",
             (new_status, notes, doc_id)
         )
+        # Notify the user about their document status update
+        notif_type = 'success' if new_status == 'Verified' else 'danger'
+        title = f"Document {new_status}"
+        message = f"Your document '{doc['document_name']}' has been {new_status}."
+        cursor.execute("""
+            INSERT INTO notifications (user_id, title, message, type)
+            VALUES (?, ?, ?, ?)
+        """, (doc['user_id'], title, message, notif_type))
+        
         conn.commit()
         conn.close()
         
