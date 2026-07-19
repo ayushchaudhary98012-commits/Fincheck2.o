@@ -2197,10 +2197,15 @@ def dev_get_otp(email):
     return jsonify({'otp': row['otp'] if row else None})
 
 
-if __name__ == '__main__':
-    # Initialize DB tables
+# Initialize DB tables
+try:
     from database import init_db
     init_db()
-    
+    print("Database tables initialized successfully.", flush=True)
+except Exception as e:
+    print(f"DATABASE INITIALIZATION ERROR: {e}", flush=True)
+
+if __name__ == '__main__':
     # Run dev server
     app.run(debug=True, port=5000)
+
