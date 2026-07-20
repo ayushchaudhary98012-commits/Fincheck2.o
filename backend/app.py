@@ -936,6 +936,19 @@ def applicant_dashboard():
         md['lender_trust_score'] = compute_trust_score(r['lender_user_id'])
         matches.append(md)
         
+    # Agreement Metrics for Vendor Dashboard
+    cursor.execute("SELECT COUNT(*) FROM agreements WHERE vendor_id = ?", (session['user_id'],))
+    total_agreements = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM agreements WHERE vendor_id = ? AND status = 'Documents Pending'", (session['user_id'],))
+    pending_docs_count = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM applications WHERE user_id = ? AND status = 'Approved'", (session['user_id'],))
+    approved_loans_count = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM agreements WHERE vendor_id = ? AND status = 'Completed'", (session['user_id'],))
+    completed_loans_count = cursor.fetchone()[0]
+
     conn.close()
     
     score = compute_trust_score(session['user_id'])
@@ -946,7 +959,11 @@ def applicant_dashboard():
         apps=apps, 
         trust_score=score, 
         trust_level=level,
-        matches=matches
+        matches=matches,
+        total_agreements=total_agreements,
+        pending_docs_count=pending_docs_count,
+        approved_loans_count=approved_loans_count,
+        completed_loans_count=completed_loans_count
     )
 
 @app.route('/apply', methods=['GET', 'POST'])
@@ -1291,6 +1308,19 @@ def lender_dashboard():
     score = compute_trust_score(session['user_id'])
     level, _ = get_trust_level(score)
     
+    # Agreement Metrics for Lender Dashboard
+    cursor.execute("SELECT COUNT(*) FROM agreements WHERE lender_id = ? AND status IN ('Pending', 'Approved', 'Documents Pending', 'Under Review')", (session['user_id'],))
+    active_agreements_count = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM matches WHERE lender_id = ? AND lender_status = 'Pending'", (session['user_id'],))
+    pending_reviews_count = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM agreements WHERE lender_id = ? AND status = 'Under Review'", (session['user_id'],))
+    docs_awaiting_review_count = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM agreements WHERE lender_id = ? AND status = 'Completed'", (session['user_id'],))
+    lender_completed_count = cursor.fetchone()[0]
+
     conn.close()
     return render_template(
         'dashboard_lender.html',
@@ -1301,7 +1331,11 @@ def lender_dashboard():
         today_matches=today_matches,
         avg_trust=avg_trust,
         trust_score=score,
-        trust_level=level
+        trust_level=level,
+        active_agreements_count=active_agreements_count,
+        pending_reviews_count=pending_reviews_count,
+        docs_awaiting_review_count=docs_awaiting_review_count,
+        lender_completed_count=lender_completed_count
     )
 
 @app.route('/api/lender/preferences/save', methods=['POST'])
@@ -1331,6 +1365,99 @@ def save_lender_preferences():
     conn.close()
     flash("Lending preferences updated and match recommendations refreshed!", "success")
     return redirect(url_for('lender_dashboard'))
+
+# --- Digital Agreement Engine ---
+
+def create_digital_agreement(match_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT id FROM agreements WHERE match_id = ?", (match_id,))
+    existing = cursor.fetchone()
+    if existing:
+        conn.close()
+        return existing['id']
+        
+    cursor.execute("SELECT * FROM matches WHERE id = ?", (match_id,))
+    match_row = cursor.fetchone()
+    if not match_row:
+        conn.close()
+        return None
+        
+    app_id = match_row['application_id']
+    lender_id = match_row['lender_id']
+    
+    cursor.execute("SELECT * FROM applications WHERE id = ?", (app_id,))
+    app_row = cursor.fetchone()
+    if not app_row:
+        conn.close()
+        return None
+        
+    vendor_id = app_row['user_id']
+    
+    cursor.execute("SELECT interest_rate FROM lender_preferences WHERE user_id = ?", (lender_id,))
+    pref = cursor.fetchone()
+    interest_rate = pref['interest_rate'] if pref and pref['interest_rate'] else 10.5
+    
+    loan_amount = app_row['loan_amount']
+    tenure_months = app_row['loan_tenure']
+    emi_amount = round(calculate_emi(loan_amount, interest_rate / 100.0, tenure_months), 2)
+    processing_fee = round(0.02 * loan_amount, 2)
+    
+    code_suffix = str(random.randint(1000, 9999))
+    date_prefix = datetime.now().strftime("%Y%m%d")
+    agreement_code = f"FT-AGR-{date_prefix}-{code_suffix}"
+    
+    cursor.execute('''
+        INSERT INTO agreements (
+            agreement_code, match_id, application_id, lender_id, vendor_id,
+            loan_amount, interest_rate, tenure_months, emi_amount, processing_fee, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (
+        agreement_code, match_id, app_id, lender_id, vendor_id,
+        loan_amount, interest_rate, tenure_months, emi_amount, processing_fee, 'Pending'
+    ))
+    
+    agreement_id = cursor.lastrowid
+    
+    cursor.execute('''
+        INSERT INTO agreement_timeline (agreement_id, actor_name, actor_role, action_type, description)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (agreement_id, app_row['full_name'], 'vendor', 'loan_submitted', f"Loan Application #AP-{app_id} submitted."))
+    
+    cursor.execute('''
+        INSERT INTO agreement_timeline (agreement_id, actor_name, actor_role, action_type, description)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (agreement_id, 'FinTrust AI Engine', 'system', 'trust_score', f"AI Trust Score evaluated at {app_row['eligibility_score'] or 75}/100."))
+    
+    cursor.execute("SELECT username FROM users WHERE id = ?", (lender_id,))
+    lender_user = cursor.fetchone()
+    lender_name = lender_user['username'] if lender_user else "Lender"
+    
+    cursor.execute('''
+        INSERT INTO agreement_timeline (agreement_id, actor_name, actor_role, action_type, description)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (agreement_id, lender_name, 'lender', 'loan_approved', f"Lender {lender_name} approved Application #AP-{app_id}."))
+    
+    cursor.execute('''
+        INSERT INTO agreement_timeline (agreement_id, actor_name, actor_role, action_type, description)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (agreement_id, 'FinTrust System', 'system', 'agreement_generated', f"Digital Loan Agreement {agreement_code} generated."))
+    
+    cursor.execute('''
+        INSERT INTO notifications (user_id, title, message, type)
+        VALUES (?, ?, ?, ?)
+    ''', (vendor_id, "Digital Agreement Generated", f"Your Digital Loan Agreement {agreement_code} has been generated. Please review, upload documents, and accept.", "success"))
+    
+    cursor.execute('''
+        INSERT INTO notifications (user_id, title, message, type)
+        VALUES (?, ?, ?, ?)
+    ''', (lender_id, "Digital Agreement Generated", f"Digital Loan Agreement {agreement_code} for application #AP-{app_id} has been generated.", "info"))
+    
+    conn.commit()
+    conn.close()
+    return agreement_id
+
 
 @app.route('/api/matches/<int:match_id>/action', methods=['POST'])
 @login_required()
@@ -1373,15 +1500,554 @@ def match_action(match_id):
     
     both_accepted = (updated_match['lender_status'] == 'Accepted' and updated_match['borrower_status'] == 'Accepted')
     
+    # Trigger digital agreement creation as soon as lender approves (or both accept)
+    if action == 'Accepted' and role == 'lender':
+        create_digital_agreement(match_id)
+        
     msg = f"Match {action.lower()} successfully."
     if both_accepted:
-        msg = "Match finalized! Peer-to-peer contact details have been successfully unlocked."
+        msg = "Match finalized! Digital Loan Agreement created and contact details unlocked."
         
     flash(msg, "success")
     if role == 'lender':
         return redirect(url_for('lender_dashboard'))
     else:
         return redirect(url_for('applicant_dashboard'))
+
+
+# --- Digital Agreement & Document Routes ---
+
+@app.route('/agreements')
+@login_required()
+def agreements_list():
+    user_id = session['user_id']
+    role = session.get('role')
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    if role == 'admin':
+        cursor.execute('''
+            SELECT a.*, app.full_name as vendor_name, u_len.username as lender_name
+            FROM agreements a
+            JOIN applications app ON a.application_id = app.id
+            JOIN users u_len ON a.lender_id = u_len.id
+            ORDER BY a.created_at DESC
+        ''')
+    elif role == 'lender':
+        cursor.execute('''
+            SELECT a.*, app.full_name as vendor_name, u_len.username as lender_name
+            FROM agreements a
+            JOIN applications app ON a.application_id = app.id
+            JOIN users u_len ON a.lender_id = u_len.id
+            WHERE a.lender_id = ?
+            ORDER BY a.created_at DESC
+        ''', (user_id,))
+    else:
+        # Vendor / Applicant
+        cursor.execute('''
+            SELECT a.*, app.full_name as vendor_name, u_len.username as lender_name
+            FROM agreements a
+            JOIN applications app ON a.application_id = app.id
+            JOIN users u_len ON a.lender_id = u_len.id
+            WHERE a.vendor_id = ?
+            ORDER BY a.created_at DESC
+        ''', (user_id,))
+        
+    agreements = cursor.fetchall()
+    conn.close()
+    return render_template('agreements_list.html', agreements=agreements)
+
+
+@app.route('/agreement/<int:agreement_id>')
+@login_required()
+def agreement_details(agreement_id):
+    user_id = session['user_id']
+    role = session.get('role')
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT a.*, 
+               app.full_name as vendor_full_name, app.email as vendor_email, app.phone as vendor_phone, app.profession as vendor_profession, app.loan_type, app.guarantor_name, app.guarantor_income,
+               u_len.username as lender_name, u_len.email as lender_email, u_len.phone as lender_phone
+        FROM agreements a
+        JOIN applications app ON a.application_id = app.id
+        JOIN users u_len ON a.lender_id = u_len.id
+        WHERE a.id = ?
+    ''', (agreement_id,))
+    agr = cursor.fetchone()
+    
+    if not agr:
+        conn.close()
+        flash("Agreement record not found.", "error")
+        return redirect(url_for('agreements_list'))
+        
+    # Security check: Only assigned lender, vendor, or admin
+    if role != 'admin' and user_id not in [agr['lender_id'], agr['vendor_id']]:
+        conn.close()
+        flash("Unauthorized: You do not have permission to view this agreement.", "error")
+        return redirect(url_for('agreements_list'))
+        
+    # Fetch documents
+    cursor.execute('''
+        SELECT d.*, u.username as uploader_name
+        FROM agreement_documents d
+        JOIN users u ON d.uploader_id = u.id
+        WHERE d.agreement_id = ?
+        ORDER BY d.created_at DESC
+    ''', (agreement_id,))
+    documents = cursor.fetchall()
+    
+    # Fetch timeline
+    cursor.execute('''
+        SELECT * FROM agreement_timeline
+        WHERE agreement_id = ?
+        ORDER BY created_at ASC
+    ''', (agreement_id,))
+    timeline = cursor.fetchall()
+    
+    conn.close()
+    
+    is_vendor = (user_id == agr['vendor_id'])
+    is_lender = (user_id == agr['lender_id'])
+    
+    return render_template('agreement_details.html', agr=agr, documents=documents, timeline=timeline, is_vendor=is_vendor, is_lender=is_lender)
+
+
+@app.route('/api/agreement/<int:agreement_id>/accept', methods=['POST'])
+@login_required()
+def accept_digital_agreement(agreement_id):
+    user_id = session['user_id']
+    role = session.get('role')
+    user_ip = request.remote_addr or '127.0.0.1'
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT * FROM agreements WHERE id = ?", (agreement_id,))
+    agr = cursor.fetchone()
+    if not agr:
+        conn.close()
+        return jsonify({'success': False, 'error': 'Agreement not found'}), 404
+        
+    if role != 'admin' and user_id not in [agr['lender_id'], agr['vendor_id']]:
+        conn.close()
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+        
+    now_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    cursor.execute("SELECT username FROM users WHERE id = ?", (user_id,))
+    user_row = cursor.fetchone()
+    user_name = user_row['username'] if user_row else "User"
+    
+    if user_id == agr['vendor_id'] or role == 'applicant':
+        cursor.execute('''
+            UPDATE agreements
+            SET vendor_consent = 1, vendor_consent_at = ?, vendor_ip = ?
+            WHERE id = ?
+        ''', (now_ts, user_ip, agreement_id))
+        actor_role = 'vendor'
+        action_desc = f"Vendor digital consent accepted by {user_name}."
+    else:
+        cursor.execute('''
+            UPDATE agreements
+            SET lender_consent = 1, lender_consent_at = ?, lender_ip = ?
+            WHERE id = ?
+        ''', (now_ts, user_ip, agreement_id))
+        actor_role = 'lender'
+        action_desc = f"Lender digital consent accepted by {user_name}."
+        
+    cursor.execute('''
+        INSERT INTO agreement_timeline (agreement_id, actor_name, actor_role, action_type, description)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (agreement_id, user_name, actor_role, 'consent_accepted', action_desc))
+    
+    # Check if both accepted
+    cursor.execute("SELECT vendor_consent, lender_consent FROM agreements WHERE id = ?", (agreement_id,))
+    updated = cursor.fetchone()
+    
+    if updated['vendor_consent'] == 1 and updated['lender_consent'] == 1:
+        cursor.execute("UPDATE agreements SET status = 'Approved' WHERE id = ?", (agreement_id,))
+        cursor.execute("UPDATE applications SET status = 'Approved' WHERE id = ?", (agr['application_id'],))
+        
+        cursor.execute('''
+            INSERT INTO agreement_timeline (agreement_id, actor_name, actor_role, action_type, description)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (agreement_id, 'FinTrust System', 'system', 'agreement_active', "Both parties digitally accepted. Agreement is now Active & Approved."))
+        
+        cursor.execute('''
+            INSERT INTO notifications (user_id, title, message, type)
+            VALUES (?, ?, ?, ?)
+        ''', (agr['vendor_id'], "Agreement Fully Approved", f"Digital Loan Agreement {agr['agreement_code']} is now fully executed!", "success"))
+        
+        cursor.execute('''
+            INSERT INTO notifications (user_id, title, message, type)
+            VALUES (?, ?, ?, ?)
+        ''', (agr['lender_id'], "Agreement Fully Approved", f"Digital Loan Agreement {agr['agreement_code']} is now fully executed!", "success"))
+    else:
+        cursor.execute("UPDATE agreements SET status = 'Documents Pending' WHERE id = ?", (agreement_id,))
+        
+    conn.commit()
+    conn.close()
+    
+    flash("Digital consent accepted successfully!", "success")
+    return redirect(url_for('agreement_details', agreement_id=agreement_id))
+
+
+@app.route('/api/agreement/<int:agreement_id>/upload_document', methods=['POST'])
+@login_required()
+def upload_agreement_document(agreement_id):
+    user_id = session['user_id']
+    role = session.get('role')
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT * FROM agreements WHERE id = ?", (agreement_id,))
+    agr = cursor.fetchone()
+    if not agr:
+        conn.close()
+        flash("Agreement not found.", "error")
+        return redirect(url_for('agreements_list'))
+        
+    if role != 'admin' and user_id not in [agr['lender_id'], agr['vendor_id']]:
+        conn.close()
+        flash("Unauthorized file upload.", "error")
+        return redirect(url_for('agreements_list'))
+        
+    if 'document_file' not in request.files:
+        conn.close()
+        flash("No file selected.", "error")
+        return redirect(url_for('agreement_details', agreement_id=agreement_id))
+        
+    file = request.files['document_file']
+    doc_type = request.form.get('document_type', 'Supporting Document').strip()
+    
+    if not file or file.filename == '':
+        conn.close()
+        flash("Please select a file to upload.", "error")
+        return redirect(url_for('agreement_details', agreement_id=agreement_id))
+        
+    filename = file.filename
+    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+    allowed_exts = {'pdf', 'jpg', 'jpeg', 'png'}
+    
+    if ext not in allowed_exts:
+        conn.close()
+        flash(f"Invalid file type .{ext}. Allowed formats: PDF, JPG, JPEG, PNG.", "error")
+        return redirect(url_for('agreement_details', agreement_id=agreement_id))
+        
+    # Save file securely
+    from werkzeug.utils import secure_filename
+    safe_name = secure_filename(filename)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    stored_filename = f"{timestamp}_{user_id}_{safe_name}"
+    
+    upload_dir = os.path.join(os.path.dirname(__file__), 'uploads', 'agreements', str(agreement_id))
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    full_path = os.path.join(upload_dir, stored_filename)
+    file.save(full_path)
+    file_size = os.path.getsize(full_path)
+    
+    uploader_role = 'vendor' if user_id == agr['vendor_id'] else 'lender'
+    
+    cursor.execute('''
+        INSERT INTO agreement_documents (
+            agreement_id, application_id, uploader_id, uploader_role,
+            document_name, document_type, file_path, file_size, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (
+        agreement_id, agr['application_id'], user_id, uploader_role,
+        safe_name, doc_type, full_path, file_size, 'Pending'
+    ))
+    
+    cursor.execute("SELECT username FROM users WHERE id = ?", (user_id,))
+    u_row = cursor.fetchone()
+    uploader_name = u_row['username'] if u_row else "User"
+    
+    cursor.execute('''
+        INSERT INTO agreement_timeline (agreement_id, actor_name, actor_role, action_type, description)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (agreement_id, uploader_name, uploader_role, 'document_uploaded', f"{uploader_name} uploaded {doc_type} ({safe_name})."))
+    
+    # Update agreement status to Under Review
+    cursor.execute("UPDATE agreements SET status = 'Under Review' WHERE id = ?", (agreement_id,))
+    
+    # Send notification
+    recipient_id = agr['lender_id'] if uploader_role == 'vendor' else agr['vendor_id']
+    cursor.execute('''
+        INSERT INTO notifications (user_id, title, message, type)
+        VALUES (?, ?, ?, ?)
+    ''', (recipient_id, "New Document Uploaded", f"{uploader_name} uploaded a {doc_type} for agreement {agr['agreement_code']}.", "info"))
+    
+    conn.commit()
+    conn.close()
+    
+    flash(f"Document '{doc_type}' uploaded successfully!", "success")
+    return redirect(url_for('agreement_details', agreement_id=agreement_id))
+
+
+@app.route('/api/agreement/document/<int:doc_id>/status', methods=['POST'])
+@login_required()
+def update_document_status(doc_id):
+    user_id = session['user_id']
+    role = session.get('role')
+    new_status = request.form.get('status', 'Approved') # Approved or Rejected
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT d.*, a.lender_id, a.vendor_id, a.agreement_code
+        FROM agreement_documents d
+        JOIN agreements a ON d.agreement_id = a.id
+        WHERE d.id = ?
+    ''', (doc_id,))
+    doc = cursor.fetchone()
+    
+    if not doc:
+        conn.close()
+        flash("Document record not found.", "error")
+        return redirect(url_for('agreements_list'))
+        
+    if role != 'admin' and user_id != doc['lender_id']:
+        conn.close()
+        flash("Unauthorized: Only the lender or admin can review documents.", "error")
+        return redirect(url_for('agreement_details', agreement_id=doc['agreement_id']))
+        
+    cursor.execute("UPDATE agreement_documents SET status = ? WHERE id = ?", (new_status, doc_id))
+    
+    cursor.execute("SELECT username FROM users WHERE id = ?", (user_id,))
+    u_row = cursor.fetchone()
+    reviewer_name = u_row['username'] if u_row else "Lender"
+    
+    cursor.execute('''
+        INSERT INTO agreement_timeline (agreement_id, actor_name, actor_role, action_type, description)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (doc['agreement_id'], reviewer_name, 'lender', 'document_reviewed', f"{reviewer_name} marked {doc['document_type']} as {new_status}."))
+    
+    cursor.execute('''
+        INSERT INTO notifications (user_id, title, message, type)
+        VALUES (?, ?, ?, ?)
+    ''', (doc['vendor_id'], "Document Status Updated", f"Your {doc['document_type']} has been marked as {new_status}.", "info"))
+    
+    conn.commit()
+    conn.close()
+    
+    flash(f"Document status updated to {new_status}.", "success")
+    return redirect(url_for('agreement_details', agreement_id=doc['agreement_id']))
+
+
+@app.route('/agreement/document/<int:doc_id>/download')
+@login_required()
+def download_agreement_document(doc_id):
+    user_id = session['user_id']
+    role = session.get('role')
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT d.*, a.lender_id, a.vendor_id
+        FROM agreement_documents d
+        JOIN agreements a ON d.agreement_id = a.id
+        WHERE d.id = ?
+    ''', (doc_id,))
+    doc = cursor.fetchone()
+    conn.close()
+    
+    if not doc:
+        flash("Document not found.", "error")
+        return redirect(url_for('agreements_list'))
+        
+    if role != 'admin' and user_id not in [doc['lender_id'], doc['vendor_id']]:
+        flash("Unauthorized access to document.", "error")
+        return redirect(url_for('agreements_list'))
+        
+    if not os.path.exists(doc['file_path']):
+        flash("Document file not found on server storage.", "error")
+        return redirect(url_for('agreement_details', agreement_id=doc['agreement_id']))
+        
+    return send_file(doc['file_path'], as_attachment=True, download_name=doc['document_name'])
+
+
+@app.route('/agreement/<int:agreement_id>/pdf')
+@login_required()
+def generate_agreement_pdf(agreement_id):
+    user_id = session['user_id']
+    role = session.get('role')
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT a.*, 
+               app.full_name as vendor_full_name, app.email as vendor_email, app.phone as vendor_phone, app.profession as vendor_profession, app.loan_type, app.guarantor_name, app.guarantor_income,
+               u_len.username as lender_name, u_len.email as lender_email, u_len.phone as lender_phone
+        FROM agreements a
+        JOIN applications app ON a.application_id = app.id
+        JOIN users u_len ON a.lender_id = u_len.id
+        WHERE a.id = ?
+    ''', (agreement_id,))
+    agr = cursor.fetchone()
+    conn.close()
+    
+    if not agr:
+        flash("Agreement not found.", "error")
+        return redirect(url_for('agreements_list'))
+        
+    if role != 'admin' and user_id not in [agr['lender_id'], agr['vendor_id']]:
+        flash("Unauthorized PDF download.", "error")
+        return redirect(url_for('agreements_list'))
+        
+    buffer = io.BytesIO()
+    
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+    
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+    story = []
+    styles = getSampleStyleSheet()
+    
+    title_style = ParagraphStyle(
+        'DocTitle',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=20,
+        leading=24,
+        textColor=colors.HexColor('#0F172A'),
+        alignment=1
+    )
+    
+    subtitle_style = ParagraphStyle(
+        'DocSubTitle',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=10,
+        leading=14,
+        textColor=colors.HexColor('#64748B'),
+        alignment=1
+    )
+    
+    h2_style = ParagraphStyle(
+        'SectionHeader',
+        parent=styles['Heading2'],
+        fontName='Helvetica-Bold',
+        fontSize=12,
+        leading=16,
+        textColor=colors.HexColor('#1E293B'),
+        spaceBefore=12,
+        spaceAfter=6
+    )
+    
+    body_style = ParagraphStyle(
+        'BodyDark',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=9,
+        leading=13,
+        textColor=colors.HexColor('#334155')
+    )
+    
+    # Header
+    story.append(Paragraph("FINTRUST AI P2P LENDING", title_style))
+    story.append(Paragraph(f"DIGITAL LOAN AGREEMENT & PROMISSORY NOTE &bull; Code: {agr['agreement_code']}", subtitle_style))
+    story.append(Spacer(1, 10))
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#CBD5E1'), spaceAfter=15))
+    
+    # Summary Table
+    summary_data = [
+        [Paragraph("<b>Agreement ID:</b>", body_style), Paragraph(agr['agreement_code'], body_style), Paragraph("<b>Date & Time:</b>", body_style), Paragraph(str(agr['created_at']), body_style)],
+        [Paragraph("<b>Application Ref:</b>", body_style), Paragraph(f"#AP-{agr['application_id']}", body_style), Paragraph("<b>Status:</b>", body_style), Paragraph(f"<b>{agr['status']}</b>", body_style)],
+    ]
+    sum_table = Table(summary_data, colWidths=[100, 160, 100, 160])
+    sum_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F8FAFC')),
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#E2E8F0')),
+        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
+        ('PADDING', (0,0), (-1,-1), 6),
+    ]))
+    story.append(sum_table)
+    story.append(Spacer(1, 15))
+    
+    # Parties Table
+    story.append(Paragraph("PARTIES TO THE AGREEMENT", h2_style))
+    parties_data = [
+        [Paragraph("<b>LENDER DETAILS</b>", body_style), Paragraph("<b>VENDOR / BORROWER DETAILS</b>", body_style)],
+        [
+            Paragraph(f"<b>Name:</b> {agr['lender_name']}<br/><b>Email:</b> {agr['lender_email']}<br/><b>Phone:</b> {agr['lender_phone'] or 'N/A'}", body_style),
+            Paragraph(f"<b>Name:</b> {agr['vendor_full_name']}<br/><b>Email:</b> {agr['vendor_email']}<br/><b>Phone:</b> {agr['vendor_phone']}<br/><b>Profession:</b> {agr['vendor_profession']}", body_style)
+        ]
+    ]
+    part_table = Table(parties_data, colWidths=[260, 260])
+    part_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#EEF2FF')),
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#C7D2FE')),
+        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E0E7FF')),
+        ('PADDING', (0,0), (-1,-1), 8),
+    ]))
+    story.append(part_table)
+    story.append(Spacer(1, 15))
+    
+    # Financial Terms Table
+    story.append(Paragraph("FINANCIAL TERMS & REPAYMENT SCHEDULE", h2_style))
+    fin_data = [
+        [Paragraph("<b>Principal Amount:</b>", body_style), Paragraph(f"₹{agr['loan_amount']:,.2f}", body_style), Paragraph("<b>Interest Rate:</b>", body_style), Paragraph(f"{agr['interest_rate']}% p.a.", body_style)],
+        [Paragraph("<b>Tenure:</b>", body_style), Paragraph(f"{agr['tenure_months']} Months", body_style), Paragraph("<b>Monthly EMI:</b>", body_style), Paragraph(f"₹{agr['emi_amount']:,.2f}", body_style)],
+        [Paragraph("<b>Processing Fee:</b>", body_style), Paragraph(f"₹{agr['processing_fee']:,.2f} (2%)", body_style), Paragraph("<b>Loan Purpose:</b>", body_style), Paragraph(agr['loan_type'], body_style)],
+        [Paragraph("<b>Due Date:</b>", body_style), Paragraph("5th of every month", body_style), Paragraph("<b>Penalty Terms:</b>", body_style), Paragraph("2.0% per month on overdue installments", body_style)]
+    ]
+    fin_table = Table(fin_data, colWidths=[120, 140, 120, 140])
+    fin_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F8FAFC')),
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#E2E8F0')),
+        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
+        ('PADDING', (0,0), (-1,-1), 6),
+    ]))
+    story.append(fin_table)
+    story.append(Spacer(1, 15))
+    
+    # Legal Disclaimer & Mutual Acceptance Statement
+    story.append(Paragraph("MUTUAL ACCEPTANCE & LEGAL DISCLAIMER", h2_style))
+    statement_text = "<b>This agreement is digitally generated and mutually accepted by both the lender and the vendor through the platform.</b> By accepting this agreement, the vendor promises to repay the principal amount along with interest to the lender in monthly installments as specified."
+    story.append(Paragraph(statement_text, body_style))
+    story.append(Spacer(1, 10))
+    disclaimer_text = "<i>Platform Disclaimer: FinTrust acts solely as an AI-powered Peer-to-Peer matchmaking and credit scoring technology service provider. FinTrust is not a banking entity and does not directly issue debt obligations. All financial transactions and promissory notes are legally binding directly between the Lender and the Vendor.</i>"
+    story.append(Paragraph(disclaimer_text, body_style))
+    story.append(Spacer(1, 15))
+    
+    # Digital Consent Logs Table
+    story.append(Paragraph("DIGITAL CONSENT STAMPS", h2_style))
+    vendor_stamp = f"ACCEPTED<br/>Time: {agr['vendor_consent_at'] or 'Pending'}<br/>IP: {agr['vendor_ip'] or 'N/A'}" if agr['vendor_consent'] else "PENDING ACCEPTANCE"
+    lender_stamp = f"ACCEPTED<br/>Time: {agr['lender_consent_at'] or 'Pending'}<br/>IP: {agr['lender_ip'] or 'N/A'}" if agr['lender_consent'] else "PENDING ACCEPTANCE"
+    
+    stamp_data = [
+        [Paragraph("<b>VENDOR DIGITAL SIGNATURE</b>", body_style), Paragraph("<b>LENDER DIGITAL SIGNATURE</b>", body_style)],
+        [Paragraph(f"<b>{agr['vendor_full_name']}</b><br/>{vendor_stamp}", body_style), Paragraph(f"<b>{agr['lender_name']}</b><br/>{lender_stamp}", body_style)]
+    ]
+    stamp_table = Table(stamp_data, colWidths=[260, 260])
+    stamp_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F1F5F9')),
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#CBD5E1')),
+        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
+        ('PADDING', (0,0), (-1,-1), 8),
+    ]))
+    story.append(stamp_table)
+    
+    doc.build(story)
+    buffer.seek(0)
+    
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f"{agr['agreement_code']}.pdf",
+        mimetype='application/pdf'
+    )
 
 # --- Lender/Admin Flow ---
 

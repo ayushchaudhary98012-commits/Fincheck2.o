@@ -152,6 +152,69 @@ def init_db():
         )
     ''')
 
+    # Create Agreements table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS agreements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agreement_code TEXT UNIQUE NOT NULL,
+            match_id INTEGER NOT NULL,
+            application_id INTEGER NOT NULL,
+            lender_id INTEGER NOT NULL,
+            vendor_id INTEGER NOT NULL,
+            loan_amount REAL NOT NULL,
+            interest_rate REAL NOT NULL DEFAULT 10.5,
+            tenure_months INTEGER NOT NULL,
+            emi_amount REAL NOT NULL,
+            processing_fee REAL NOT NULL DEFAULT 0.0,
+            status TEXT NOT NULL DEFAULT 'Pending',
+            vendor_consent INTEGER DEFAULT 0,
+            vendor_consent_at TIMESTAMP,
+            vendor_ip TEXT,
+            lender_consent INTEGER DEFAULT 0,
+            lender_consent_at TIMESTAMP,
+            lender_ip TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE,
+            FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE,
+            FOREIGN KEY (lender_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (vendor_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # Create Agreement Documents table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS agreement_documents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agreement_id INTEGER NOT NULL,
+            application_id INTEGER NOT NULL,
+            uploader_id INTEGER NOT NULL,
+            uploader_role TEXT NOT NULL,
+            document_name TEXT NOT NULL,
+            document_type TEXT NOT NULL,
+            file_path TEXT NOT NULL,
+            file_size INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'Pending',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (agreement_id) REFERENCES agreements(id) ON DELETE CASCADE,
+            FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE,
+            FOREIGN KEY (uploader_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # Create Agreement Timeline table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS agreement_timeline (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agreement_id INTEGER NOT NULL,
+            actor_name TEXT NOT NULL,
+            actor_role TEXT NOT NULL,
+            action_type TEXT NOT NULL,
+            description TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (agreement_id) REFERENCES agreements(id) ON DELETE CASCADE
+        )
+    ''')
+
     # Check if a seed admin user exists, if not create one
     cursor.execute("SELECT * FROM users WHERE role = 'admin'")
     if not cursor.fetchone():
