@@ -6,7 +6,7 @@ from werkzeug.security import generate_password_hash
 from app import app, get_db_connection
 from database import init_db
 
-class FinCheckTestCase(unittest.TestCase):
+class FinTrustTestCase(unittest.TestCase):
     def setUp(self):
         # Configure app for testing
         app.config['TESTING'] = True
@@ -25,12 +25,12 @@ class FinCheckTestCase(unittest.TestCase):
         admin_pass = generate_password_hash('admin123')
         cursor.execute(
             "INSERT INTO users (username, password_hash, email, phone, role) VALUES (?, ?, ?, ?, ?)",
-            ('admin', admin_pass, 'admin@fincheck.com', '+1111111111', 'admin')
+            ('admin', admin_pass, 'admin@fintrust.com', '+1111111111', 'admin')
         )
         applicant_pass = generate_password_hash('user123')
         cursor.execute(
             "INSERT INTO users (username, password_hash, email, phone, role) VALUES (?, ?, ?, ?, ?)",
-            ('user', applicant_pass, 'user@fincheck.com', '+2222222222', 'applicant')
+            ('user', applicant_pass, 'user@fintrust.com', '+2222222222', 'applicant')
         )
         conn.commit()
         conn.close()
@@ -445,7 +445,7 @@ class FinCheckTestCase(unittest.TestCase):
         self.client.get('/logout', follow_redirects=True)
         self.client.post('/login', data={
             'action': 'login',
-            'username': 'admin@fincheck.com',
+            'username': 'admin@fintrust.com',
             'password': 'admin123'
         }, follow_redirects=True)
         
