@@ -151,10 +151,14 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
+from flask_cors import CORS
+
 app = Flask(__name__,
             template_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'frontend', 'templates'),
             static_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'frontend', 'static'))
 app.secret_key = 'fintrust_super_secret_session_key_19385'
+CORS(app, supports_credentials=True)
+
 
 # Firebase configurations (read from environment or use fallback values for demo convenience)
 FIREBASE_API_KEY = os.environ.get('FIREBASE_API_KEY', 'AIzaSyA1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6')
