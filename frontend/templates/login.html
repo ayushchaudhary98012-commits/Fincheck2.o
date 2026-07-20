@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}FinCheck | Authentication{% endblock %}
+{% block title %}FinTrust | Authentication{% endblock %}
 
 {% block content %}
 <div class="glass-panel form-container">
@@ -61,7 +61,7 @@
         <input type="hidden" name="action" value="register">
         <div class="form-header">
             <h2>Create Account</h2>
-            <p>Join FinCheck and check your eligibility instantly.</p>
+            <p>Join FinTrust and check your eligibility instantly.</p>
         </div>
         
         <div class="form-group">
@@ -127,7 +127,7 @@
         const isDemoMode = (firebaseConfig.apiKey === 'AIzaSyA1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6');
         
         if (isDemoMode) {
-            console.warn("FinCheck running in Firebase Offline/Demo mode. Token verification will bypass API hits.");
+            console.warn("FinTrust running in Firebase Offline/Demo mode. Token verification will bypass API hits.");
         } else {
             try {
                 firebase.initializeApp(firebaseConfig);

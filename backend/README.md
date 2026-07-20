@@ -1,6 +1,6 @@
-# FinCheck - AI-Powered Loan Eligibility & Financial Health Analysis System
+# FinTrust - AI-Powered Loan Eligibility & Financial Health Analysis System
 
-FinCheck is a modern, full-stack fintech platform designed to help applicants check their loan eligibility, receive detailed financial health ratings, and obtain Explainable AI (XAI) justifications for approval and rejection. It also provides a lender portal with dashboard analytics, searches/filters, status overriding capabilities, and PDF generation.
+FinTrust is a modern, full-stack fintech platform designed to help applicants check their loan eligibility, receive detailed financial health ratings, and obtain Explainable AI (XAI) justifications for approval and rejection. It also provides a lender portal with dashboard analytics, searches/filters, status overriding capabilities, and PDF generation.
 
 ---
 
@@ -22,7 +22,7 @@ FinCheck is a modern, full-stack fintech platform designed to help applicants ch
 ## Directory Structure
 
 ```
-fincheck/
+fintrust/
 ├── app.py                      # Flask application and REST routing
 ├── database.py                 # SQLite database schema definition and helpers
 ├── train_model.py              # ML model dataset generator and trainer
@@ -52,7 +52,7 @@ fincheck/
 
 1. **Navigate to the Project Folder**:
    ```powershell
-   cd fincheck
+   cd fintrust
    ```
 
 2. **Install Dependencies**:

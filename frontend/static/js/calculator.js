@@ -1,4 +1,4 @@
-// FinCheck - Interactive EMI Calculator Module
+// FinTrust - Interactive EMI Calculator Module
 
 document.addEventListener('DOMContentLoaded', () => {
     initCalculator();

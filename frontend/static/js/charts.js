@@ -1,4 +1,4 @@
-// FinCheck - Financial Dashboard Charts Module
+// FinTrust - Financial Dashboard Charts Module
 
 document.addEventListener('DOMContentLoaded', () => {
     initResultGauge();

@@ -1,4 +1,4 @@
-// FinCheck - Premium Banking Client-Side Logic
+// FinTrust - Premium Banking Client-Side Logic
 
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();

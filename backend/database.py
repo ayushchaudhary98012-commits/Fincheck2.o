@@ -158,19 +158,19 @@ def init_db():
         admin_pass = generate_password_hash('admin123')
         cursor.execute(
             "INSERT INTO users (username, password_hash, email, role) VALUES (?, ?, ?, ?)",
-            ('admin', admin_pass, 'admin@fincheck.com', 'admin')
+            ('admin', admin_pass, 'admin@fintrust.com', 'admin')
         )
         # Also create a default applicant for easy testing
         applicant_pass = generate_password_hash('user123')
         cursor.execute(
             "INSERT INTO users (username, password_hash, email, role) VALUES (?, ?, ?, ?)",
-            ('user', applicant_pass, 'user@fincheck.com', 'applicant')
+            ('user', applicant_pass, 'user@fintrust.com', 'applicant')
         )
         # Create a default lender
         lender_pass = generate_password_hash('lender123')
         cursor.execute(
             "INSERT INTO users (username, password_hash, email, role) VALUES (?, ?, ?, ?)",
-            ('lender', lender_pass, 'lender@fincheck.com', 'lender')
+            ('lender', lender_pass, 'lender@fintrust.com', 'lender')
         )
         lender_id = cursor.lastrowid
         cursor.execute(

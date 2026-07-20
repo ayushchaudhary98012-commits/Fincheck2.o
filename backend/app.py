@@ -53,9 +53,9 @@ def send_otp_email(to_email, otp):
     print(f"[OTP Code]: {otp}", flush=True)
     print("*" * 60 + "\n", flush=True)
     
-    # If using seeded test accounts (e.g. user@fincheck.com), route OTP to the configured target
+    # If using seeded test accounts (e.g. user@fintrust.com), route OTP to the configured target
     target_email = to_email
-    if to_email.lower().endswith('@fincheck.com') and (email_user or resend_key):
+    if to_email.lower().endswith('@fintrust.com') and (email_user or resend_key):
         target_email = email_user if email_user else "onboarding@resend.dev"
         print(f"[INFO] Redirected test account OTP from {to_email} to developer email {target_email}", flush=True)
         
@@ -68,16 +68,16 @@ def send_otp_email(to_email, otp):
             "Content-Type": "application/json"
         }
         html_body = f"""Hello,<br><br>
-Your FinCheck AI login verification code is: <strong>{otp}</strong><br><br>
+Your FinTrust AI login verification code is: <strong>{otp}</strong><br><br>
 This code is valid for 5 minutes. Please enter this code on the verification screen to complete your login.<br><br>
 If you did not request this code, please secure your account.<br><br>
 Best regards,<br>
-FinCheck Security Team"""
+FinTrust Security Team"""
         
         payload = {
-            "from": "FinCheck <onboarding@resend.dev>",
+            "from": "FinTrust <onboarding@resend.dev>",
             "to": [target_email],
-            "subject": f"FinCheck Verification Code: {otp}",
+            "subject": f"FinTrust Verification Code: {otp}",
             "html": html_body
         }
         
@@ -103,7 +103,7 @@ FinCheck Security Team"""
         print("WARNING: Neither RESEND_API_KEY nor (EMAIL_USER & EMAIL_PASS) environment variables are fully configured!", flush=True)
         print("SIMULATING EMAIL SEND IN CONSOLE ONLY.", flush=True)
         print(f"To: {target_email}")
-        print(f"Subject: FinCheck AI - Login Verification Code")
+        print(f"Subject: FinTrust AI - Login Verification Code")
         print(f"OTP Code: {otp}")
         print("="*50 + "\n")
         return True
@@ -113,20 +113,20 @@ FinCheck Security Team"""
         msg = MIMEMultipart()
         msg['From'] = email_user
         msg['To'] = target_email
-        msg['Subject'] = f"FinCheck Verification Code: {otp}"
+        msg['Subject'] = f"FinTrust Verification Code: {otp}"
         msg['Date'] = formatdate(localtime=True)
         msg['Message-ID'] = make_msgid()
         
         body = f"""Hello,
  
-Your FinCheck AI login verification code is: {otp}
+Your FinTrust AI login verification code is: {otp}
  
 This code is valid for 5 minutes. Please enter this code on the verification screen to complete your login.
  
 If you did not request this code, please secure your account.
  
 Best regards,
-FinCheck Security Team"""
+FinTrust Security Team"""
         msg.attach(MIMEText(body, 'plain'))
         
         server = smtplib.SMTP('smtp.gmail.com', 587, timeout=10)
@@ -154,12 +154,12 @@ from reportlab.lib import colors
 app = Flask(__name__,
             template_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'frontend', 'templates'),
             static_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'frontend', 'static'))
-app.secret_key = 'fincheck_super_secret_session_key_19385'
+app.secret_key = 'fintrust_super_secret_session_key_19385'
 
 # Firebase configurations (read from environment or use fallback values for demo convenience)
 FIREBASE_API_KEY = os.environ.get('FIREBASE_API_KEY', 'AIzaSyA1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6')
-FIREBASE_AUTH_DOMAIN = os.environ.get('FIREBASE_AUTH_DOMAIN', 'fincheck-demo.firebaseapp.com')
-FIREBASE_PROJECT_ID = os.environ.get('FIREBASE_PROJECT_ID', 'fincheck-demo')
+FIREBASE_AUTH_DOMAIN = os.environ.get('FIREBASE_AUTH_DOMAIN', 'fintrust-demo.firebaseapp.com')
+FIREBASE_PROJECT_ID = os.environ.get('FIREBASE_PROJECT_ID', 'fintrust-demo')
 FIREBASE_APP_ID = os.environ.get('FIREBASE_APP_ID', '1:1234567890:web:1a2b3c4d5e6f7g8h9i0j')
 
 @app.context_processor
@@ -1102,14 +1102,14 @@ def apply():
         # 3. Simulate Email Notification
         print("\n" + "="*50)
         print(f"SIMULATED EMAIL NOTIFICATION SENT TO {email}")
-        print(f"Subject: FinCheck Loan Application Reference #AP-{new_app_id} Received")
+        print(f"Subject: FinTrust Loan Application Reference #AP-{new_app_id} Received")
         print(f"Dear {full_name},\n")
-        print(f"Thank you for submitting your loan application on FinCheck. Your AI-powered eligibility results are ready:")
+        print(f"Thank you for submitting your loan application on FinTrust. Your AI-powered eligibility results are ready:")
         print(f"- Reference ID: #AP-{new_app_id}")
         print(f"- Decision Status: {status}")
         print(f"- Eligibility Score: {score}/100")
         print(f"- Risk Level: {risk_level}")
-        print(f"\nYou can download your PDF report and track updates by logging into your FinCheck dashboard.")
+        print(f"\nYou can download your PDF report and track updates by logging into your FinTrust dashboard.")
         print("="*50 + "\n")
         
         flash("Application submitted and credit evaluation complete!", "success")
@@ -1575,7 +1575,7 @@ def api_applications_pdf(app_id):
     )
     
     # Report Header
-    story.append(Paragraph("FinCheck Eligibility Report", title_style))
+    story.append(Paragraph("FinTrust Eligibility Report", title_style))
     story.append(Paragraph(f"Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Reference: #AP-{app_row['id']}", subtitle_style))
     story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#CBD5E1'), spaceAfter=15))
     
@@ -1665,7 +1665,7 @@ def api_applications_pdf(app_id):
     # Append official compliance disclaimer
     story.append(Paragraph("5. Compliance & Platform AI Disclaimer", section_style))
     story.append(Paragraph(
-        "This recommendation is generated by AI based on user-provided information. Final lending decisions remain entirely between lenders and borrowers. FinCheck AI is not a financial institution and is not responsible for any financial transactions or disputes.",
+        "This recommendation is generated by AI based on user-provided information. Final lending decisions remain entirely between lenders and borrowers. FinTrust AI is not a financial institution and is not responsible for any financial transactions or disputes.",
         ParagraphStyle('DisclCommercial', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#64748B'), fontName='Helvetica-Oblique')
     ))
     
@@ -1680,7 +1680,7 @@ def api_applications_pdf(app_id):
     return send_file(
         buffer, 
         as_attachment=True, 
-        download_name=f"FinCheck_Report_AP{app_row['id']}.pdf", 
+        download_name=f"FinTrust_Report_AP{app_row['id']}.pdf", 
         mimetype='application/pdf'
     )
 
@@ -1691,7 +1691,7 @@ def get_gemini_response(api_key, prompt, context_data=None):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={api_key}"
     
     system_instr = (
-        "You are FinCheck's AI Assistant, a friendly and professional financial advisor helping users on a "
+        "You are FinTrust's AI Assistant, a friendly and professional financial advisor helping users on a "
         "Peer-to-Peer (P2P) lending and machine-learning trust scoring platform. "
         "Answer the user's question clearly and concisely in a conversational style. Keep responses short and helpful (max 3-4 sentences)."
     )
@@ -1857,7 +1857,7 @@ def chatbot_api():
     # 1. Greetings (exact word match for short greetings to prevent sub-string matching)
     if any(greet in words for greet in ['hi', 'hello', 'hey', 'yo', 'greetings']) or 'who are you' in message or 'what is your name' in message:
         return jsonify({
-            'response': f"Hello {username}! I am FinCheck's AI Assistant. I can help analyze your credit evaluation, check matching results with P2P lenders, suggest optimized loan parameters, or guide you on improving your trust score. How can I assist you today?"
+            'response': f"Hello {username}! I am FinTrust's AI Assistant. I can help analyze your credit evaluation, check matching results with P2P lenders, suggest optimized loan parameters, or guide you on improving your trust score. How can I assist you today?"
         })
         
     # 2. EMI / Calculator (Check this before general 'calculate' keyword checks)
@@ -1959,7 +1959,7 @@ def chatbot_api():
     # 9. Thank you
     elif any(thanks in message for thanks in ['thanks', 'thank you', 'great', 'awesome', 'cool', 'perfect']):
         return jsonify({
-            'response': "You're very welcome! I'm here to help. Let me know if you have any other questions about FinCheck AI."
+            'response': "You're very welcome! I'm here to help. Let me know if you have any other questions about FinTrust AI."
         })
         
     # 10. Help command

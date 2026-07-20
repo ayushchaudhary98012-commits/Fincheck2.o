@@ -1,6 +1,6 @@
-# 🏦 FinCheck - AI-Powered Loan Eligibility & Financial Health Analysis System
+# 🏦 FinTrust - AI-Powered Loan Eligibility & Financial Health Analysis System
 
-FinCheck is a modern, full-stack financial technology platform designed to help applicants check their loan eligibility, receive detailed financial health ratings, and obtain Explainable AI (XAI) justifications for approvals and rejections. It also features a comprehensive Lender/Admin Portal with interactive charts, status overrides, and PDF report downloads.
+FinTrust is a modern, full-stack financial technology platform designed to help applicants check their loan eligibility, receive detailed financial health ratings, and obtain Explainable AI (XAI) justifications for approvals and rejections. It also features a comprehensive Lender/Admin Portal with interactive charts, status overrides, and PDF report downloads.
 
 ---
 
@@ -24,7 +24,7 @@ FinCheck is a modern, full-stack financial technology platform designed to help 
 The project separates the logic layer (`backend`) from the presentation assets (`frontend`):
 
 ```text
-Fincheck--main/
+FinTrust--main/
 ├── backend/
 │   ├── app.py                  # Main Flask application and API routes
 │   ├── database.py             # SQLite database configuration and seeding
@@ -41,7 +41,7 @@ Fincheck--main/
 
 ## 🛠️ Installation & Getting Started
 
-Follow these steps to run FinCheck locally:
+Follow these steps to run FinTrust locally:
 
 ### 1. Install Dependencies
 Ensure you have Python 3.8+ installed, then run:
