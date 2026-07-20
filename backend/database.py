@@ -138,6 +138,22 @@ def init_db():
         )
     ''')
 
+    # Create Digital Loan Agreements table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS agreements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            match_id INTEGER NOT NULL UNIQUE,
+            contract_code TEXT NOT NULL UNIQUE,
+            borrower_signature TEXT,
+            borrower_signed_at TIMESTAMP,
+            lender_signature TEXT,
+            lender_signed_at TIMESTAMP,
+            status TEXT NOT NULL DEFAULT 'Awaiting Signatures',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE
+        )
+    ''')
+
     # Create Notifications table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS notifications (

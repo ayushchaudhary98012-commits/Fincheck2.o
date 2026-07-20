@@ -1335,13 +1335,273 @@ def match_action(match_id):
     
     msg = f"Match {action.lower()} successfully."
     if both_accepted:
-        msg = "Match finalized! Peer-to-peer contact details have been successfully unlocked."
+        conn = get_db_connection()
+        c_cursor = conn.cursor()
+        contract_code = f"FT-AGR-{match_id:05d}-{secrets.token_hex(2).upper()}"
+        c_cursor.execute("SELECT id FROM agreements WHERE match_id = ?", (match_id,))
+        if not c_cursor.fetchone():
+            c_cursor.execute("""
+                INSERT INTO agreements (match_id, contract_code, status)
+                VALUES (?, ?, 'Awaiting Signatures')
+            """, (match_id, contract_code))
+            
+            c_cursor.execute("SELECT user_id FROM applications WHERE id = ?", (match_row['application_id'],))
+            b_row = c_cursor.fetchone()
+            if b_row:
+                c_cursor.execute("""
+                    INSERT INTO notifications (user_id, title, message, type)
+                    VALUES (?, 'Digital Loan Agreement Ready', 'Mutual acceptance confirmed! Please review and sign your digital loan agreement.', 'agreement')
+                """, (b_row['user_id'],))
+            c_cursor.execute("""
+                INSERT INTO notifications (user_id, title, message, type)
+                VALUES (?, 'Digital Loan Agreement Ready', 'Mutual acceptance confirmed! Please review and sign your digital loan agreement.', 'agreement')
+            """, (match_row['lender_id'],))
+            conn.commit()
+        conn.close()
+        msg = "Match finalized! Both parties have accepted. Please review and sign your digital loan agreement."
         
     flash(msg, "success")
     if role == 'lender':
-        return redirect(url_for('lender_dashboard'))
+        return redirect(url_for('view_agreement', match_id=match_id) if both_accepted else url_for('lender_dashboard'))
     else:
+        return redirect(url_for('view_agreement', match_id=match_id) if both_accepted else url_for('applicant_dashboard'))
+
+# --- Digital Loan Agreement Routes ---
+
+def calculate_emi_val(principal, rate_pa, tenure_months):
+    if tenure_months <= 0 or principal <= 0:
+        return 0.0
+    if rate_pa <= 0:
+        return round(principal / tenure_months, 2)
+    r = rate_pa / (12 * 100)
+    n = tenure_months
+    emi = (principal * r * (1 + r)**n) / (((1 + r)**n) - 1)
+    return round(emi, 2)
+
+@app.route('/agreement/<int:match_id>')
+@login_required()
+def view_agreement(match_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT m.id as match_id, m.lender_id, m.application_id, m.lender_status, m.borrower_status,
+               a.user_id as borrower_user_id, a.full_name, a.email, a.phone, a.guarantor_name, a.loan_amount, a.loan_tenure,
+               l.username as lender_name, l.email as lender_email, l.phone as lender_phone,
+               lp.interest_rate
+        FROM matches m
+        JOIN applications a ON m.application_id = a.id
+        JOIN users l ON m.lender_id = l.id
+        LEFT JOIN lender_preferences lp ON lp.user_id = l.id
+        WHERE m.id = ?
+    """, (match_id,))
+    match_row = cursor.fetchone()
+    
+    if not match_row:
+        conn.close()
+        flash("Match agreement not found.", "danger")
+        return redirect(url_for('applicant_dashboard' if session.get('role') != 'lender' else 'lender_dashboard'))
+        
+    curr_user_id = session.get('user_id')
+    if curr_user_id not in (match_row['lender_id'], match_row['borrower_user_id']) and session.get('role') != 'admin':
+        conn.close()
+        flash("Unauthorized access to contract.", "danger")
         return redirect(url_for('applicant_dashboard'))
+        
+    cursor.execute("SELECT * FROM agreements WHERE match_id = ?", (match_id,))
+    contract = cursor.fetchone()
+    if not contract:
+        contract_code = f"FT-AGR-{match_id:05d}-{secrets.token_hex(2).upper()}"
+        cursor.execute("""
+            INSERT INTO agreements (match_id, contract_code, status)
+            VALUES (?, ?, 'Awaiting Signatures')
+        """, (match_id, contract_code))
+        conn.commit()
+        cursor.execute("SELECT * FROM agreements WHERE match_id = ?", (match_id,))
+        contract = cursor.fetchone()
+        
+    rate_pa = match_row['interest_rate'] or 10.5
+    emi = calculate_emi_val(match_row['loan_amount'], rate_pa, match_row['loan_tenure'])
+    
+    is_borrower = (curr_user_id == match_row['borrower_user_id'])
+    is_lender = (curr_user_id == match_row['lender_id'])
+    
+    can_sign = False
+    if contract['status'] != 'Executed':
+        if is_borrower and not contract['borrower_signature']:
+            can_sign = True
+        elif is_lender and not contract['lender_signature']:
+            can_sign = True
+
+    user_full_name = match_row['full_name'] if is_borrower else match_row['lender_name']
+    
+    conn.close()
+    return render_template('agreement.html',
+                           match=match_row,
+                           contract=contract,
+                           calculated_emi=emi,
+                           can_sign=can_sign,
+                           user_full_name=user_full_name)
+
+@app.route('/agreement/<int:match_id>/sign', methods=['POST'])
+@login_required()
+def sign_agreement(match_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT m.id as match_id, m.lender_id, a.user_id as borrower_user_id
+        FROM matches m
+        JOIN applications a ON m.application_id = a.id
+        WHERE m.id = ?
+    """, (match_id,))
+    match_row = cursor.fetchone()
+    
+    if not match_row:
+        conn.close()
+        flash("Match not found.", "danger")
+        return redirect(url_for('applicant_dashboard'))
+        
+    curr_user_id = session.get('user_id')
+    is_borrower = (curr_user_id == match_row['borrower_user_id'])
+    is_lender = (curr_user_id == match_row['lender_id'])
+    
+    if not is_borrower and not is_lender:
+        conn.close()
+        flash("Unauthorized signature attempt.", "danger")
+        return redirect(url_for('applicant_dashboard'))
+        
+    sig_data = request.form.get('signature_data', '').strip()
+    typed_sig = request.form.get('typed_signature', '').strip()
+    
+    final_sig = sig_data if sig_data else typed_sig
+    if not final_sig:
+        conn.close()
+        flash("Please provide a drawn or typed signature.", "warning")
+        return redirect(url_for('view_agreement', match_id=match_id))
+        
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    if is_borrower:
+        cursor.execute("""
+            UPDATE agreements
+            SET borrower_signature = ?, borrower_signed_at = ?
+            WHERE match_id = ?
+        """, (final_sig, now_str, match_id))
+    elif is_lender:
+        cursor.execute("""
+            UPDATE agreements
+            SET lender_signature = ?, lender_signed_at = ?
+            WHERE match_id = ?
+        """, (final_sig, now_str, match_id))
+        
+    conn.commit()
+    
+    cursor.execute("SELECT borrower_signature, lender_signature FROM agreements WHERE match_id = ?", (match_id,))
+    agr = cursor.fetchone()
+    if agr['borrower_signature'] and agr['lender_signature']:
+        cursor.execute("UPDATE agreements SET status = 'Executed' WHERE match_id = ?", (match_id,))
+        conn.commit()
+        flash("Digital agreement successfully executed by both parties!", "success")
+    else:
+        flash("Signature recorded! Awaiting signature from counterparty.", "success")
+        
+    conn.close()
+    return redirect(url_for('view_agreement', match_id=match_id))
+
+@app.route('/agreement/<int:match_id>/pdf')
+@login_required()
+def download_agreement_pdf(match_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT m.id as match_id, m.lender_id, m.application_id,
+               a.user_id as borrower_user_id, a.full_name, a.email, a.phone, a.guarantor_name, a.loan_amount, a.loan_tenure, a.loan_type,
+               l.username as lender_name, l.email as lender_email,
+               lp.interest_rate,
+               ag.contract_code, ag.borrower_signature, ag.borrower_signed_at, ag.lender_signature, ag.lender_signed_at, ag.status, ag.created_at
+        FROM matches m
+        JOIN applications a ON m.application_id = a.id
+        JOIN users l ON m.lender_id = l.id
+        LEFT JOIN lender_preferences lp ON lp.user_id = l.id
+        JOIN agreements ag ON ag.match_id = m.id
+        WHERE m.id = ?
+    """, (match_id,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if not row:
+        flash("Agreement record not found.", "danger")
+        return redirect(url_for('applicant_dashboard'))
+        
+    pdf_buffer = io.BytesIO()
+    doc = SimpleDocTemplate(pdf_buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+    styles = getSampleStyleSheet()
+    story = []
+    
+    title_style = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=18, textColor=colors.HexColor('#4f46e5'), spaceAfter=6)
+    sub_style = ParagraphStyle('DocSub', parent=styles['Normal'], fontSize=9, textColor=colors.HexColor('#6b7280'), spaceAfter=15)
+    body_style = ParagraphStyle('DocBody', parent=styles['Normal'], fontSize=9, leading=13, spaceAfter=8)
+    
+    story.append(Paragraph("FinTrust Digital Peer-to-Peer Loan Agreement", title_style))
+    story.append(Paragraph(f"Contract Reference: {row['contract_code']} | Status: {row['status']} | Date: {row['created_at']}", sub_style))
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#e5e7eb'), spaceAfter=15))
+    
+    rate_pa = row['interest_rate'] or 10.5
+    emi = calculate_emi_val(row['loan_amount'], rate_pa, row['loan_tenure'])
+    
+    data_summary = [
+        ["Principal Amount", f"Rs. {row['loan_amount']:,.2f}", "Interest Rate", f"{rate_pa}% P.A."],
+        ["Loan Tenure", f"{row['loan_tenure']} Months", "Est. Monthly EMI", f"Rs. {emi:,.2f}"],
+        ["Lender (Party A)", row['lender_name'], "Borrower (Party B)", row['full_name']],
+        ["Lender Contact", row['lender_email'], "Guarantor Name", row['guarantor_name']]
+    ]
+    t = Table(data_summary, colWidths=[130, 140, 130, 140])
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f9fafb')),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#e5e7eb')),
+        ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
+        ('FONTSIZE', (0,0), (-1,-1), 9),
+        ('PADDING', (0,0), (-1,-1), 6),
+        ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'),
+        ('FONTNAME', (2,0), (2,-1), 'Helvetica-Bold'),
+    ]))
+    story.append(t)
+    story.append(Spacer(1, 15))
+    
+    story.append(Paragraph("<b>PROMISSORY NOTE & BINDING TERMS</b>", ParagraphStyle('H2', parent=styles['Heading2'], fontSize=11, textColor=colors.HexColor('#111827'))))
+    terms_text = (
+        f"1. <b>Repayment Obligation:</b> The Borrower ({row['full_name']}) acknowledges receipt of Rs. {row['loan_amount']:,.2f} from "
+        f"the Lender ({row['lender_name']}) and promises to repay the principal together with interest at {rate_pa}% per annum.<br/>"
+        f"2. <b>Schedule:</b> Repayments shall be made in {row['loan_tenure']} equal monthly installments of Rs. {emi:,.2f}.<br/>"
+        f"3. <b>Guarantor Obligation:</b> The Guarantor ({row['guarantor_name']}) accepts joint liability under this agreement.<br/>"
+        f"4. <b>Digital Signature:</b> This agreement is legally binding under applicable electronic signature laws."
+    )
+    story.append(Paragraph(terms_text, body_style))
+    story.append(Spacer(1, 20))
+    
+    sig_b = "Digitally Signed (On File)" if row['borrower_signature'] and row['borrower_signature'].startswith('data:image') else (row['borrower_signature'] or "Awaiting Signature")
+    sig_l = "Digitally Signed (On File)" if row['lender_signature'] and row['lender_signature'].startswith('data:image') else (row['lender_signature'] or "Awaiting Signature")
+    
+    sig_table_data = [
+        ["Lender Digital Signature", "Borrower Digital Signature"],
+        [sig_l, sig_b],
+        [f"Date: {row['lender_signed_at'] or 'N/A'}", f"Date: {row['borrower_signed_at'] or 'N/A'}"]
+    ]
+    st = Table(sig_table_data, colWidths=[270, 270])
+    st.setStyle(TableStyle([
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+        ('PADDING', (0,0), (-1,-1), 8),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,-1), 9),
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#f1f5f9')),
+    ]))
+    story.append(st)
+    
+    doc.build(story)
+    pdf_buffer.seek(0)
+    return send_file(pdf_buffer, as_attachment=True, download_name=f"{row['contract_code']}.pdf", mimetype='application/pdf')
 
 # --- Lender/Admin Flow ---
 
