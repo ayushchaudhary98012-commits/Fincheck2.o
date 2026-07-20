@@ -215,7 +215,20 @@ def login_required(role=None):
             if 'user_id' not in session:
                 flash("Please log in to access this page.", "error")
                 return redirect(url_for('login_route'))
-            if role and session.get('role') != role:
+                
+            # Verify user exists in database to prevent Foreign Key errors from stale sessions
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, role FROM users WHERE id = ?", (session['user_id'],))
+            user_row = cursor.fetchone()
+            conn.close()
+            
+            if not user_row:
+                session.clear()
+                flash("Your session is invalid or the account was modified. Please log in again.", "warning")
+                return redirect(url_for('login_route'))
+                
+            if role and user_row['role'] != role:
                 flash("Unauthorized access.", "error")
                 return redirect(url_for('landing'))
             return f(*args, **kwargs)
@@ -1135,6 +1148,11 @@ def apply():
             
             flash("Application submitted and credit evaluation complete!", "success")
             return redirect(url_for('result', app_id=new_app_id))
+        except sqlite3.IntegrityError as ie:
+            print(f"[INTEGRITY ERROR] {ie}")
+            session.clear()
+            flash("Your session reference was invalid. Please log in again.", "warning")
+            return redirect(url_for('login_route'))
         except Exception as err:
             import traceback
             traceback.print_exc()
