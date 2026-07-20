@@ -143,10 +143,10 @@
                 </div>
                 <div class="form-group">
                     <label for="loan_tenure">Loan Tenure (Months) *</label>
-                    <div style="display: flex; gap: 10px;">
-                        <input type="number" id="loan_tenure" name="loan_tenure" class="form-control" placeholder="Type months (e.g. 15)" min="1" max="120" required style="flex: 1;">
-                        <select id="tenure_preset_select" class="form-control" style="flex: 1;" onchange="if(this.value) document.getElementById('loan_tenure').value = this.value">
-                            <option value="" disabled selected>Or pick preset...</option>
+                    <div style="position: relative;">
+                        <input type="number" id="loan_tenure" name="loan_tenure" class="form-control" placeholder="Enter months (1 - 120)" min="1" max="120" required style="padding-right: 42px;">
+                        <select id="tenure_overlay_select" title="Choose from preset options" style="position: absolute; right: 0; top: 0; bottom: 0; width: 42px; opacity: 0; cursor: pointer; z-index: 2;" onchange="if(this.value){ document.getElementById('loan_tenure').value = this.value; this.selectedIndex = 0; }">
+                            <option value="" disabled selected></option>
                             <option value="6">6 Months (0.5 Yr)</option>
                             <option value="12">12 Months (1 Yr)</option>
                             <option value="18">18 Months (1.5 Yrs)</option>
@@ -160,8 +160,11 @@
                             <option value="108">108 Months (9 Yrs)</option>
                             <option value="120">120 Months (10 Yrs)</option>
                         </select>
+                        <div style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--text-secondary); z-index: 1; font-size: 0.85rem;">
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
                     </div>
-                    <span style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; display: block;">Type any custom duration (1 - 120 months) or select a preset option.</span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; display: block;">Type any number of months (1 - 120) or click the arrow on the right to pick a preset.</span>
                 </div>
             </div>
             
