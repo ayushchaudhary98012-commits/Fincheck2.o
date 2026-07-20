@@ -304,77 +304,80 @@ def get_trust_level(score):
         return 'Bronze', '#64748B' # Gray
 
 def trigger_matching_engine(app_id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    # 1. Fetch application details
-    cursor.execute("SELECT * FROM applications WHERE id = ?", (app_id,))
-    app_row = cursor.fetchone()
-    if not app_row:
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 1. Fetch application details
+        cursor.execute("SELECT * FROM applications WHERE id = ?", (app_id,))
+        app_row = cursor.fetchone()
+        if not app_row:
+            conn.close()
+            return
+            
+        user_id = app_row['user_id']
+        loan_amount = app_row['loan_amount'] or 0.0
+        loan_tenure = app_row['loan_tenure'] or 12
+        
+        # Get applicant's trust score
+        trust_score = compute_trust_score(user_id)
+        
+        # 2. Find all active lenders
+        cursor.execute("""
+            SELECT u.id, lp.max_lending_amount, lp.min_trust_score, lp.interest_rate, lp.preferred_location, lp.preferred_duration 
+            FROM users u 
+            JOIN lender_preferences lp ON u.id = lp.user_id 
+            WHERE u.role = 'lender'
+        """)
+        lenders = cursor.fetchall()
+        
+        for lender in lenders:
+            lender_id = lender['id']
+            max_amount = lender['max_lending_amount'] if lender['max_lending_amount'] is not None else 2000000.0
+            min_score = lender['min_trust_score'] if lender['min_trust_score'] is not None else 60
+            pref_dur = lender['preferred_duration'] if lender['preferred_duration'] is not None else 24
+            pref_loc = lender['preferred_location'] if lender['preferred_location'] is not None else 'All'
+            
+            # Calculate compatibility
+            score = 50
+            reasons = []
+            
+            if trust_score >= min_score:
+                score += 15
+                reasons.append("✓ Trust Score Meets Requirement")
+            else:
+                reasons.append("✗ Trust Score Below Target")
+                
+            if loan_amount <= max_amount:
+                score += 15
+                reasons.append("✓ Loan Amount Compatible")
+            else:
+                reasons.append("✗ Loan Amount Exceeds Preferred Limit")
+                
+            if loan_tenure <= pref_dur:
+                score += 10
+                reasons.append("✓ Preferred Duration Matches")
+            else:
+                reasons.append("✗ Loan Duration Longer Than Desired")
+                
+            if pref_loc == 'All' or pref_loc.lower() == 'mumbai' or (app_row['full_name'] and pref_loc.lower() in app_row['full_name'].lower()):
+                score += 10
+                reasons.append("✓ Same Location")
+            else:
+                reasons.append("✓ Location Acceptable")
+                
+            # Ensure we don't duplicate matches
+            cursor.execute("SELECT id FROM matches WHERE lender_id = ? AND application_id = ?", (lender_id, app_id))
+            if not cursor.fetchone():
+                cursor.execute('''
+                    INSERT INTO matches (lender_id, application_id, compatibility_score, reasons)
+                    VALUES (?, ?, ?, ?)
+                ''', (lender_id, app_id, min(100, score), json.dumps(reasons)))
+                
+        conn.commit()
         conn.close()
-        return
-        
-    user_id = app_row['user_id']
-    loan_amount = app_row['loan_amount']
-    loan_tenure = app_row['loan_tenure']
-    
-    # Get applicant's trust score
-    trust_score = compute_trust_score(user_id)
-    
-    # 2. Find all active lenders
-    cursor.execute("""
-        SELECT u.id, lp.max_lending_amount, lp.min_trust_score, lp.interest_rate, lp.preferred_location, lp.preferred_duration 
-        FROM users u 
-        JOIN lender_preferences lp ON u.id = lp.user_id 
-        WHERE u.role = 'lender'
-    """)
-    lenders = cursor.fetchall()
-    
-    for lender in lenders:
-        lender_id = lender['id']
-        max_amount = lender['max_lending_amount']
-        min_score = lender['min_trust_score']
-        pref_dur = lender['preferred_duration']
-        pref_loc = lender['preferred_location']
-        
-        # Calculate compatibility
-        score = 50
-        reasons = []
-        
-        if trust_score >= min_score:
-            score += 15
-            reasons.append("✓ Trust Score Meets Requirement")
-        else:
-            reasons.append("✗ Trust Score Below Target")
-            
-        if loan_amount <= max_amount:
-            score += 15
-            reasons.append("✓ Loan Amount Compatible")
-        else:
-            reasons.append("✗ Loan Amount Exceeds Preferred Limit")
-            
-        if loan_tenure <= pref_dur:
-            score += 10
-            reasons.append("✓ Preferred Duration Matches")
-        else:
-            reasons.append("✗ Loan Duration Longer Than Desired")
-            
-        if pref_loc == 'All' or pref_loc.lower() == 'mumbai' or pref_loc.lower() in app_row['full_name'].lower():
-            score += 10
-            reasons.append("✓ Same Location")
-        else:
-            reasons.append("✓ Location Acceptable")
-            
-        # Ensure we don't duplicate matches
-        cursor.execute("SELECT id FROM matches WHERE lender_id = ? AND application_id = ?", (lender_id, app_id))
-        if not cursor.fetchone():
-            cursor.execute('''
-                INSERT INTO matches (lender_id, application_id, compatibility_score, reasons)
-                VALUES (?, ?, ?, ?)
-            ''', (lender_id, app_id, min(100, score), json.dumps(reasons)))
-            
-    conn.commit()
-    conn.close()
+    except Exception as e:
+        print(f"[ERROR] trigger_matching_engine failed for app_id {app_id}: {e}")
 
 
 # --- Routes ---
@@ -937,187 +940,206 @@ def applicant_dashboard():
 @login_required('applicant')
 def apply():
     if request.method == 'POST':
-        # Retrieve Form Data
-        full_name = request.form.get('full_name')
-        age = int(request.form.get('age', 0))
-        gender = request.form.get('gender')
-        email = request.form.get('email')
-        phone = request.form.get('phone')
-        employment_type = request.form.get('employment_type')
-        profession = request.form.get('profession')
-        monthly_income = float(request.form.get('monthly_income', 0))
-        existing_emi = float(request.form.get('existing_emi', 0))
-        loan_type = request.form.get('loan_type')
-        loan_amount = float(request.form.get('loan_amount', 0))
-        loan_tenure = int(request.form.get('loan_tenure', 0))
-        guarantor_name = request.form.get('guarantor_name')
-        guarantor_income = float(request.form.get('guarantor_income', 0))
-        existing_debts = float(request.form.get('existing_debts', 0))
-        credit_history = int(request.form.get('credit_history', 1))
-        
-        # Verify ML Load status
-        if not model or not scaler:
-            flash("Machine Learning engine offline. Contact Admin.", "error")
-            return redirect(url_for('applicant_dashboard'))
+        try:
+            # Safe parsing helpers for form numbers
+            def safe_float(val, default=0.0):
+                try:
+                    return float(val) if val is not None and str(val).strip() != '' else default
+                except (ValueError, TypeError):
+                    return default
+
+            def safe_int(val, default=0):
+                try:
+                    return int(val) if val is not None and str(val).strip() != '' else default
+                except (ValueError, TypeError):
+                    return default
+
+            # Retrieve Form Data
+            full_name = (request.form.get('full_name') or '').strip()
+            age = safe_int(request.form.get('age'), 25)
+            gender = request.form.get('gender') or 'Other'
+            email = (request.form.get('email') or '').strip()
+            phone = (request.form.get('phone') or '').strip()
+            employment_type = request.form.get('employment_type') or 'Salaried'
+            profession = (request.form.get('profession') or '').strip()
+            monthly_income = safe_float(request.form.get('monthly_income'), 0.0)
+            existing_emi = safe_float(request.form.get('existing_emi'), 0.0)
+            loan_type = request.form.get('loan_type') or 'Personal'
+            loan_amount = safe_float(request.form.get('loan_amount'), 0.0)
+            loan_tenure = safe_int(request.form.get('loan_tenure'), 12)
+            guarantor_name = (request.form.get('guarantor_name') or 'N/A').strip()
+            guarantor_income = safe_float(request.form.get('guarantor_income'), 0.0)
+            existing_debts = safe_float(request.form.get('existing_debts'), 0.0)
+            credit_history = safe_int(request.form.get('credit_history'), 1)
             
-        # 1. Prep Features & Predict Probabilities
-        features = [
-            monthly_income,
-            existing_emi,
-            1 if employment_type == 'Salaried' else 0,
-            loan_amount,
-            loan_tenure,
-            credit_history,
-            guarantor_income
-        ]
-        
-        features_scaled = scaler.transform([features])
-        prob = float(model.predict_proba(features_scaled)[0][1])
-        score = int(prob * 100)
-        
-        # Credit history cap rule
-        if credit_history == 0:
-            score = min(score, 45)
-            
-        # Determine Status and Risk
-        if score >= 70:
-            status = 'Approved'
-            risk_level = 'Low'
-        elif score >= 40:
-            status = 'Moderate'
-            risk_level = 'Medium'
-        else:
-            status = 'Rejected'
-            risk_level = 'High'
-            
-        # 2. XAI Reason & Recommendation Rules
-        reasons = []
-        suggestions = []
-        
-        new_emi = calculate_emi(loan_amount, 0.09, loan_tenure)
-        total_monthly_obligations = existing_emi + new_emi
-        income_capacity = monthly_income + 0.5 * guarantor_income
-        dti_ratio = total_monthly_obligations / income_capacity
-        
-        if dti_ratio > 0.45:
-            reasons.append({
-                'type': 'con',
-                'text': f"High debt-to-income ratio ({dti_ratio*100:.1f}%) significantly increases risk. Total commitments consume too much monthly income."
-            })
-            suggestions.append("Work on paying down existing balances to reduce your debt-to-income ratio below 36%.")
-        else:
-            reasons.append({
-                'type': 'pro',
-                'text': f"Healthy debt-to-income ratio ({dti_ratio*100:.1f}%) demonstrates good repayment capacity."
-            })
-            
-        if credit_history == 1:
-            reasons.append({
-                'type': 'pro',
-                'text': "Positive credit history indicates strong past repayment behavior."
-            })
-        else:
-            reasons.append({
-                'type': 'con',
-                'text': "Poor credit history or past defaults severely restrict underwriting scores."
-            })
-            suggestions.append("Build positive credit by taking small lines of credit and paying them off on time.")
-            
-        if guarantor_income > 0.5 * monthly_income:
-            reasons.append({
-                'type': 'pro',
-                'text': f"Strong guarantor backing (₹{guarantor_income:,.0f}/mo) provides additional security."
-            })
-        else:
-            if loan_amount > 5 * monthly_income * 12:
-                suggestions.append("Adding a co-signer or guarantor with stable monthly income can mitigate risk.")
+            # Verify ML Load status
+            if not model or not scaler:
+                flash("Machine Learning engine offline. Contact Admin.", "error")
+                return redirect(url_for('applicant_dashboard'))
                 
-        annual_income = monthly_income * 12
-        lti_ratio = loan_amount / annual_income
-        if lti_ratio > 4.5:
-            reasons.append({
-                'type': 'con',
-                'text': f"Requested loan size is high ({lti_ratio:.1f}x annual income), increasing leverage risk."
-            })
-            suggestions.append("Apply for a lower loan amount or extend the tenure to reduce the monthly burden.")
-        else:
-            reasons.append({
-                'type': 'pro',
-                'text': f"Reasonable leverage level ({lti_ratio:.1f}x annual income) fits risk profiles."
-            })
+            # 1. Prep Features & Predict Probabilities
+            features = [
+                monthly_income,
+                existing_emi,
+                1 if employment_type == 'Salaried' else 0,
+                loan_amount,
+                loan_tenure,
+                credit_history,
+                guarantor_income
+            ]
             
-        if monthly_income > 8000:
-            reasons.append({
-                'type': 'pro',
-                'text': f"High net monthly income (₹{monthly_income:,.0f}) provides solid cushion."
-            })
-        elif monthly_income < 3000:
-            reasons.append({
-                'type': 'con',
-                'text': f"Moderate net monthly income (₹{monthly_income:,.0f}) limits maximum debt capacity."
-            })
-            suggestions.append("Explore options to supplement monthly income or reduce the requested loan size.")
+            features_scaled = scaler.transform([features])
+            prob = float(model.predict_proba(features_scaled)[0][1])
+            score = int(prob * 100)
             
-        if employment_type == 'Salaried':
-            reasons.append({
-                'type': 'pro',
-                'text': "Salaried employment type offers predictable and stable income streams."
-            })
-        else:
-            reasons.append({
-                'type': 'con',
-                'text': "Self-employed status carries higher monthly revenue variability."
-            })
+            # Credit history cap rule
+            if credit_history == 0:
+                score = min(score, 45)
+                
+            # Determine Status and Risk
+            if score >= 70:
+                status = 'Approved'
+                risk_level = 'Low'
+            elif score >= 40:
+                status = 'Moderate'
+                risk_level = 'Medium'
+            else:
+                status = 'Rejected'
+                risk_level = 'High'
+                
+            # 2. XAI Reason & Recommendation Rules
+            reasons = []
+            suggestions = []
             
-        reasons_json = json.dumps(reasons)
-        
-        # Save to database
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO applications (
-                user_id, full_name, age, gender, email, phone, employment_type, profession,
+            new_emi = calculate_emi(loan_amount, 0.09, loan_tenure)
+            total_monthly_obligations = existing_emi + new_emi
+            income_capacity = max(1.0, monthly_income + 0.5 * guarantor_income)
+            dti_ratio = total_monthly_obligations / income_capacity
+            
+            if dti_ratio > 0.45:
+                reasons.append({
+                    'type': 'con',
+                    'text': f"High debt-to-income ratio ({dti_ratio*100:.1f}%) significantly increases risk. Total commitments consume too much monthly income."
+                })
+                suggestions.append("Work on paying down existing balances to reduce your debt-to-income ratio below 36%.")
+            else:
+                reasons.append({
+                    'type': 'pro',
+                    'text': f"Healthy debt-to-income ratio ({dti_ratio*100:.1f}%) demonstrates good repayment capacity."
+                })
+                
+            if credit_history == 1:
+                reasons.append({
+                    'type': 'pro',
+                    'text': "Positive credit history indicates strong past repayment behavior."
+                })
+            else:
+                reasons.append({
+                    'type': 'con',
+                    'text': "Poor credit history or past defaults severely restrict underwriting scores."
+                })
+                suggestions.append("Build positive credit by taking small lines of credit and paying them off on time.")
+                
+            if guarantor_income > 0.5 * monthly_income:
+                reasons.append({
+                    'type': 'pro',
+                    'text': f"Strong guarantor backing (₹{guarantor_income:,.0f}/mo) provides additional security."
+                })
+            else:
+                if loan_amount > 5 * max(1.0, monthly_income) * 12:
+                    suggestions.append("Adding a co-signer or guarantor with stable monthly income can mitigate risk.")
+                    
+            annual_income = max(1.0, monthly_income * 12)
+            lti_ratio = loan_amount / annual_income
+            if lti_ratio > 4.5:
+                reasons.append({
+                    'type': 'con',
+                    'text': f"Requested loan size is high ({lti_ratio:.1f}x annual income), increasing leverage risk."
+                })
+                suggestions.append("Apply for a lower loan amount or extend the tenure to reduce the monthly burden.")
+            else:
+                reasons.append({
+                    'type': 'pro',
+                    'text': f"Reasonable leverage level ({lti_ratio:.1f}x annual income) fits risk profiles."
+                })
+                
+            if monthly_income > 8000:
+                reasons.append({
+                    'type': 'pro',
+                    'text': f"High net monthly income (₹{monthly_income:,.0f}) provides solid cushion."
+                })
+            elif monthly_income < 3000:
+                reasons.append({
+                    'type': 'con',
+                    'text': f"Moderate net monthly income (₹{monthly_income:,.0f}) limits maximum debt capacity."
+                })
+                suggestions.append("Explore options to supplement monthly income or reduce the requested loan size.")
+                
+            if employment_type == 'Salaried':
+                reasons.append({
+                    'type': 'pro',
+                    'text': "Salaried employment type offers predictable and stable income streams."
+                })
+            else:
+                reasons.append({
+                    'type': 'con',
+                    'text': "Self-employed status carries higher monthly revenue variability."
+                })
+                
+            reasons_json = json.dumps(reasons)
+            
+            # Save to database
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO applications (
+                    user_id, full_name, age, gender, email, phone, employment_type, profession,
+                    monthly_income, existing_emi, loan_type, loan_amount, loan_tenure,
+                    guarantor_name, guarantor_income, existing_debts, credit_history,
+                    status, approval_probability, eligibility_score, risk_level, reasons
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                session['user_id'], full_name, age, gender, email, phone, employment_type, profession,
                 monthly_income, existing_emi, loan_type, loan_amount, loan_tenure,
                 guarantor_name, guarantor_income, existing_debts, credit_history,
-                status, approval_probability, eligibility_score, risk_level, reasons
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            session['user_id'], full_name, age, gender, email, phone, employment_type, profession,
-            monthly_income, existing_emi, loan_type, loan_amount, loan_tenure,
-            guarantor_name, guarantor_income, existing_debts, credit_history,
-            status, prob, score, risk_level, reasons_json
-        ))
-        new_app_id = cursor.lastrowid
-        
-        # Insert application submitted notification
-        notif_title = "Loan Application Submitted"
-        notif_msg = f"Your application #AP-{new_app_id} for a {loan_type} Loan of ₹{loan_amount:,.2f} has been submitted."
-        cursor.execute("""
-            INSERT INTO notifications (user_id, title, message, type)
-            VALUES (?, ?, ?, ?)
-        """, (session['user_id'], notif_title, notif_msg, 'info'))
-        
-        conn.commit()
-        conn.close()
-        
-        # Trigger matching with active lenders
-        trigger_matching_engine(new_app_id)
-        
-        # 3. Simulate Email Notification
-        print("\n" + "="*50)
-        print(f"SIMULATED EMAIL NOTIFICATION SENT TO {email}")
-        print(f"Subject: FinTrust Loan Application Reference #AP-{new_app_id} Received")
-        print(f"Dear {full_name},\n")
-        print(f"Thank you for submitting your loan application on FinTrust. Your AI-powered eligibility results are ready:")
-        print(f"- Reference ID: #AP-{new_app_id}")
-        print(f"- Decision Status: {status}")
-        print(f"- Eligibility Score: {score}/100")
-        print(f"- Risk Level: {risk_level}")
-        print(f"\nYou can download your PDF report and track updates by logging into your FinTrust dashboard.")
-        print("="*50 + "\n")
-        
-        flash("Application submitted and credit evaluation complete!", "success")
-        return redirect(url_for('result', app_id=new_app_id))
+                status, prob, score, risk_level, reasons_json
+            ))
+            new_app_id = cursor.lastrowid
+            
+            # Insert application submitted notification
+            notif_title = "Loan Application Submitted"
+            notif_msg = f"Your application #AP-{new_app_id} for a {loan_type} Loan of ₹{loan_amount:,.2f} has been submitted."
+            cursor.execute("""
+                INSERT INTO notifications (user_id, title, message, type)
+                VALUES (?, ?, ?, ?)
+            """, (session['user_id'], notif_title, notif_msg, 'info'))
+            
+            conn.commit()
+            conn.close()
+            
+            # Trigger matching with active lenders
+            trigger_matching_engine(new_app_id)
+            
+            # 3. Simulate Email Notification
+            print("\n" + "="*50)
+            print(f"SIMULATED EMAIL NOTIFICATION SENT TO {email}")
+            print(f"Subject: FinTrust Loan Application Reference #AP-{new_app_id} Received")
+            print(f"Dear {full_name},\n")
+            print(f"Thank you for submitting your loan application on FinTrust. Your AI-powered eligibility results are ready:")
+            print(f"- Reference ID: #AP-{new_app_id}")
+            print(f"- Decision Status: {status}")
+            print(f"- Eligibility Score: {score}/100")
+            print(f"- Risk Level: {risk_level}")
+            print(f"\nYou can download your PDF report and track updates by logging into your FinTrust dashboard.")
+            print("="*50 + "\n")
+            
+            flash("Application submitted and credit evaluation complete!", "success")
+            return redirect(url_for('result', app_id=new_app_id))
+        except Exception as err:
+            import traceback
+            traceback.print_exc()
+            flash(f"Application submission error: {err}", "danger")
+            return redirect(url_for('applicant_dashboard'))
         
     return render_template('apply.html')
 
