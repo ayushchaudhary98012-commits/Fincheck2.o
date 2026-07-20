@@ -143,7 +143,22 @@
                 </div>
                 <div class="form-group">
                     <label for="loan_tenure">Loan Tenure (Months) *</label>
-                    <input type="number" id="loan_tenure" name="loan_tenure" class="form-control" placeholder="120" min="6" max="360" required>
+                    <select id="loan_tenure" name="loan_tenure" class="form-control" required>
+                        <option value="" disabled selected>Select tenure</option>
+                        <option value="6">6 Months (0.5 Year)</option>
+                        <option value="12">12 Months (1 Year)</option>
+                        <option value="18">18 Months (1.5 Years)</option>
+                        <option value="24">24 Months (2 Years)</option>
+                        <option value="36">36 Months (3 Years)</option>
+                        <option value="48">48 Months (4 Years)</option>
+                        <option value="60">60 Months (5 Years)</option>
+                        <option value="84">84 Months (7 Years)</option>
+                        <option value="120">120 Months (10 Years)</option>
+                        <option value="180">180 Months (15 Years)</option>
+                        <option value="240">240 Months (20 Years)</option>
+                        <option value="300">300 Months (25 Years)</option>
+                        <option value="360">360 Months (30 Years)</option>
+                    </select>
                 </div>
             </div>
             
