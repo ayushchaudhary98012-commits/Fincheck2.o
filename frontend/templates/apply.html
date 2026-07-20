@@ -143,21 +143,25 @@
                 </div>
                 <div class="form-group">
                     <label for="loan_tenure">Loan Tenure (Months) *</label>
-                    <select id="loan_tenure" name="loan_tenure" class="form-control" required>
-                        <option value="" disabled selected>Select tenure (Max 120 Months)</option>
-                        <option value="6">6 Months (0.5 Year)</option>
-                        <option value="12">12 Months (1 Year)</option>
-                        <option value="18">18 Months (1.5 Years)</option>
-                        <option value="24">24 Months (2 Years)</option>
-                        <option value="36">36 Months (3 Years)</option>
-                        <option value="48">48 Months (4 Years)</option>
-                        <option value="60">60 Months (5 Years)</option>
-                        <option value="72">72 Months (6 Years)</option>
-                        <option value="84">84 Months (7 Years)</option>
-                        <option value="96">96 Months (8 Years)</option>
-                        <option value="108">108 Months (9 Years)</option>
-                        <option value="120">120 Months (10 Years)</option>
-                    </select>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="number" id="loan_tenure" name="loan_tenure" class="form-control" placeholder="Type months (e.g. 15)" min="1" max="120" required style="flex: 1;">
+                        <select id="tenure_preset_select" class="form-control" style="flex: 1;" onchange="if(this.value) document.getElementById('loan_tenure').value = this.value">
+                            <option value="" disabled selected>Or pick preset...</option>
+                            <option value="6">6 Months (0.5 Yr)</option>
+                            <option value="12">12 Months (1 Yr)</option>
+                            <option value="18">18 Months (1.5 Yrs)</option>
+                            <option value="24">24 Months (2 Yrs)</option>
+                            <option value="36">36 Months (3 Yrs)</option>
+                            <option value="48">48 Months (4 Yrs)</option>
+                            <option value="60">60 Months (5 Yrs)</option>
+                            <option value="72">72 Months (6 Yrs)</option>
+                            <option value="84">84 Months (7 Yrs)</option>
+                            <option value="96">96 Months (8 Yrs)</option>
+                            <option value="108">108 Months (9 Yrs)</option>
+                            <option value="120">120 Months (10 Yrs)</option>
+                        </select>
+                    </div>
+                    <span style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; display: block;">Type any custom duration (1 - 120 months) or select a preset option.</span>
                 </div>
             </div>
             
