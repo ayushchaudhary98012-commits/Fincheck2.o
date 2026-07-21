@@ -1408,15 +1408,29 @@ def create_digital_agreement(match_id):
     date_prefix = datetime.now().strftime("%Y%m%d")
     agreement_code = f"FT-AGR-{date_prefix}-{code_suffix}"
     
-    cursor.execute('''
-        INSERT INTO agreements (
-            agreement_code, match_id, application_id, lender_id, vendor_id,
-            loan_amount, interest_rate, tenure_months, emi_amount, processing_fee, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (
-        agreement_code, match_id, app_id, lender_id, vendor_id,
-        loan_amount, interest_rate, tenure_months, emi_amount, processing_fee, 'Pending'
-    ))
+    cursor.execute("PRAGMA table_info(agreements)")
+    agr_cols = [c[1] for c in cursor.fetchall()]
+    
+    if 'contract_code' in agr_cols:
+        cursor.execute('''
+            INSERT INTO agreements (
+                agreement_code, contract_code, match_id, application_id, lender_id, vendor_id,
+                loan_amount, interest_rate, tenure_months, emi_amount, processing_fee, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            agreement_code, agreement_code, match_id, app_id, lender_id, vendor_id,
+            loan_amount, interest_rate, tenure_months, emi_amount, processing_fee, 'Pending'
+        ))
+    else:
+        cursor.execute('''
+            INSERT INTO agreements (
+                agreement_code, match_id, application_id, lender_id, vendor_id,
+                loan_amount, interest_rate, tenure_months, emi_amount, processing_fee, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            agreement_code, match_id, app_id, lender_id, vendor_id,
+            loan_amount, interest_rate, tenure_months, emi_amount, processing_fee, 'Pending'
+        ))
     
     agreement_id = cursor.lastrowid
     
