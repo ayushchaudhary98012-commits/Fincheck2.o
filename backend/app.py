@@ -159,6 +159,9 @@ app = Flask(__name__,
 app.secret_key = 'fintrust_super_secret_session_key_19385'
 CORS(app, supports_credentials=True)
 
+FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'frontend'))
+STATIC_DIR = os.path.abspath(os.path.join(FRONTEND_DIR, 'static'))
+
 
 # Firebase configurations (read from environment or use fallback values for demo convenience)
 FIREBASE_API_KEY = os.environ.get('FIREBASE_API_KEY', 'AIzaSyA1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6')
@@ -432,6 +435,9 @@ def trigger_matching_engine(app_id):
 
 @app.route('/')
 def landing():
+    index_file = os.path.join(FRONTEND_DIR, 'index.html')
+    if os.path.exists(index_file):
+        return send_file(index_file)
     return render_template('landing.html')
 
 @app.route('/calculator')
@@ -3379,6 +3385,25 @@ def api_agreements_data():
     agreements = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return jsonify({'success': True, 'agreements': agreements})
+
+
+@app.route('/<path:filename>')
+def serve_frontend_static_files(filename):
+    if filename.startswith('api/'):
+        return jsonify({'error': 'Endpoint not found'}), 404
+        
+    target_path = os.path.join(FRONTEND_DIR, filename)
+    if os.path.exists(target_path) and os.path.isfile(target_path):
+        return send_file(target_path)
+        
+    static_target = os.path.join(STATIC_DIR, filename)
+    if os.path.exists(static_target) and os.path.isfile(static_target):
+        return send_file(static_target)
+        
+    if filename.endswith('.html') and os.path.exists(os.path.join(app.template_folder, filename)):
+        return render_template(filename)
+        
+    return jsonify({'error': 'File not found'}), 404
 
 
 
