@@ -10,23 +10,23 @@
             <i class="fas fa-sparkles"></i> Next-Gen Peer-to-Peer Lending
         </div>
         <h1 style="font-size: 3.2rem; line-height: 1.15; font-weight: 800; margin-bottom: 20px; color: var(--text-primary);">
-            AI-Powered <span style="background: linear-gradient(135deg, var(--primary) 0%, #3b82f6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Trust Scoring</span> & P2P Matching.
+            {{ _('Hero_Title') }}
         </h1>
         <p style="font-size: 1.15rem; line-height: 1.6; color: var(--text-secondary); margin-bottom: 30px; max-width: 580px;">
-            Apply for credit or register as an active lender. FinTrust AI evaluates applicant creditworthiness using machine learning, verifies documents automatically, and pairs you with the perfect counterparties.
+            {{ _('Hero_Sub') }}
         </p>
         <div class="hero-buttons" style="display: flex; gap: 15px; flex-wrap: wrap;">
             {% if session.get('user_id') %}
                 {% if session.get('role') == 'lender' %}
-                    <a href="/lender/dashboard" class="btn btn-primary" style="padding: 12px 28px; font-size: 1rem;"><i class="fas fa-wallet"></i> My Lender Portal</a>
+                    <a href="/lender/dashboard" class="btn btn-primary" style="padding: 12px 28px; font-size: 1rem;"><i class="fas fa-wallet"></i> {{ _('Lender_Portal') }}</a>
                 {% else %}
-                    <a href="/apply" class="btn btn-primary" style="padding: 12px 28px; font-size: 1rem;"><i class="fas fa-paper-plane"></i> Register for Loan</a>
+                    <a href="/apply" class="btn btn-primary" style="padding: 12px 28px; font-size: 1rem;"><i class="fas fa-paper-plane"></i> {{ _('Loan_Application_Wizard') }}</a>
                 {% endif %}
             {% else %}
-                <a href="/login" class="btn btn-primary" style="padding: 12px 28px; font-size: 1rem;"><i class="fas fa-user-plus"></i> Get Started as Borrower</a>
-                <a href="/login?register=true&role=lender" class="btn btn-outline" style="padding: 12px 28px; font-size: 1rem; border-color: var(--primary); color: var(--primary);"><i class="fas fa-hand-holding-usd"></i> Become a Lender</a>
+                <a href="/login" class="btn btn-primary" style="padding: 12px 28px; font-size: 1rem;"><i class="fas fa-user-plus"></i> {{ _('Get_Started_as_Borrower') }}</a>
+                <a href="/login?register=true&role=lender" class="btn btn-outline" style="padding: 12px 28px; font-size: 1rem; border-color: var(--primary); color: var(--primary);"><i class="fas fa-hand-holding-usd"></i> {{ _('Become_a_Lender') }}</a>
             {% endif %}
-            <a href="/calculator" class="btn btn-secondary" style="padding: 12px 28px; font-size: 1rem; background: rgba(255, 255, 255, 0.05);"><i class="fas fa-calculator"></i> EMI Calculator</a>
+            <a href="/calculator" class="btn btn-secondary" style="padding: 12px 28px; font-size: 1rem; background: rgba(255, 255, 255, 0.05);"><i class="fas fa-calculator"></i> {{ _('EMI_Calculator') }}</a>
         </div>
     </div>
     
@@ -34,8 +34,8 @@
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; animation: fadeIn 0.8s ease;">
         <div class="glass-panel" style="padding: 25px; display: flex; flex-direction: column; justify-content: space-between; height: 160px; border-radius: 16px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="font-weight: 600; font-size: 1rem; color: var(--text-secondary);">Approval Speed</div>
-                <div class="badge badge-approved" style="font-size: 0.7rem; background: rgba(16, 185, 129, 0.1); color: #10b981; border: none; padding: 3px 8px;">Instant</div>
+                <div style="font-weight: 600; font-size: 1rem; color: var(--text-secondary);">{{ _('Approval_Speed') }}</div>
+                <div class="badge badge-approved" style="font-size: 0.7rem; background: rgba(16, 185, 129, 0.1); color: #10b981; border: none; padding: 3px 8px;">{{ _('Instant') }}</div>
             </div>
             <div style="font-size: 2.2rem; font-weight: 800; color: var(--primary);">~ 3.5 Sec</div>
             <div style="font-size: 0.8rem; color: var(--text-muted);">AI credit underwriting & ML lookup</div>
@@ -43,16 +43,16 @@
         
         <div class="glass-panel" style="padding: 25px; display: flex; flex-direction: column; justify-content: space-between; height: 160px; border-radius: 16px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="font-weight: 600; font-size: 1rem; color: var(--text-secondary);">Trust Verification</div>
+                <div style="font-weight: 600; font-size: 1rem; color: var(--text-secondary);">{{ _('Trust_Verification') }}</div>
                 <i class="fas fa-shield-halved" style="color: var(--success); font-size: 1.1rem;"></i>
             </div>
-            <div style="font-size: 2.2rem; font-weight: 800; color: var(--success);">5 Levels</div>
+            <div style="font-size: 2.2rem; font-weight: 800; color: var(--success);">{{ _('Five_Levels') }}</div>
             <div style="font-size: 0.8rem; color: var(--text-muted);">Self-sovereign KYC credentials</div>
         </div>
         
         <div class="glass-panel" style="grid-column: span 2; padding: 25px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-radius: 16px;">
             <div style="display: flex; flex-direction: column; gap: 4px;">
-                <div style="font-weight: 600; font-size: 1rem; color: var(--text-secondary);">AI P2P Matching Engine</div>
+                <div style="font-weight: 600; font-size: 1rem; color: var(--text-secondary);">{{ _('AI_P2P_Matching_Engine') }}</div>
                 <div style="font-size: 0.85rem; color: var(--text-muted);">Direct borrower-to-lender automated matchmaking.</div>
             </div>
             <div style="display: flex; gap: 12px; font-size: 1.6rem; color: var(--primary);">
@@ -69,26 +69,26 @@
     <div class="glass-panel" style="display: grid; grid-template-columns: repeat(4, 1fr); padding: 30px; gap: 20px; border-radius: 20px; text-align: center; background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);">
         <div>
             <h3 style="font-size: 2rem; font-weight: 800; color: var(--primary); margin-bottom: 5px;">1,420+</h3>
-            <p style="font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Active Borrowers</p>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">{{ _('Active_Borrowers') }}</p>
         </div>
         <div style="border-left: 1px solid rgba(255, 255, 255, 0.1);">
             <h3 style="font-size: 2rem; font-weight: 800; color: var(--success); margin-bottom: 5px;">₹12.5 Cr+</h3>
-            <p style="font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Capital Matched</p>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">{{ _('Capital_Matched') }}</p>
         </div>
         <div style="border-left: 1px solid rgba(255, 255, 255, 0.1);">
             <h3 style="font-size: 2rem; font-weight: 800; color: #a855f7; margin-bottom: 5px;">94.2%</h3>
-            <p style="font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Average Compatibility</p>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">{{ _('Average_Compatibility') }}</p>
         </div>
         <div style="border-left: 1px solid rgba(255, 255, 255, 0.1);">
             <h3 style="font-size: 2rem; font-weight: 800; color: #f59e0b; margin-bottom: 5px;">82 / 100</h3>
-            <p style="font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Avg Trust Score</p>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">{{ _('Avg_Trust_Score') }}</p>
         </div>
     </div>
 </section>
 
 <!-- Features Section -->
 <section class="features-section" style="margin-bottom: 60px;">
-    <h2 class="section-title" style="text-align: center; font-size: 2.2rem; font-weight: 800; margin-bottom: 10px;">Platform Core Features</h2>
+    <h2 class="section-title" style="text-align: center; font-size: 2.2rem; font-weight: 800; margin-bottom: 10px;">{{ _('Platform_Core_Features') }}</h2>
     <p class="section-subtitle" style="text-align: center; color: var(--text-secondary); margin-bottom: 40px; max-width: 700px; margin-left: auto; margin-right: auto;">
         A state-of-the-art fintech credit environment that simplifies peer-to-peer relationships using explainable AI.
     </p>
@@ -131,7 +131,7 @@
 
 <!-- Success Stories Testimonial Section -->
 <section style="margin-bottom: 60px;">
-    <h2 class="section-title" style="text-align: center; font-size: 2.2rem; font-weight: 800; margin-bottom: 10px;">Success Stories</h2>
+    <h2 class="section-title" style="text-align: center; font-size: 2.2rem; font-weight: 800; margin-bottom: 10px;">{{ _('Success_Stories') }}</h2>
     <p class="section-subtitle" style="text-align: center; color: var(--text-secondary); margin-bottom: 40px;">Hear what our community has to say about the P2P match ecosystem.</p>
     
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">

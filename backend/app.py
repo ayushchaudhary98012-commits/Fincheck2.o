@@ -175,6 +175,41 @@ def inject_firebase_config():
         'FIREBASE_APP_ID': FIREBASE_APP_ID
     }
 
+# Translation system setup
+TRANSLATIONS = {}
+TRANSLATIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'translations')
+try:
+    for filename in os.listdir(TRANSLATIONS_DIR):
+        if filename.endswith('.json'):
+            lang_code = filename.split('.')[0]
+            file_path = os.path.join(TRANSLATIONS_DIR, filename)
+            with open(file_path, 'r', encoding='utf-8') as f:
+                TRANSLATIONS[lang_code] = json.load(f)
+except Exception as e:
+    print(f"Error loading translations: {e}")
+
+@app.context_processor
+def inject_translations():
+    lang = session.get('lang', 'en')
+    translations_dict = TRANSLATIONS.get(lang, TRANSLATIONS.get('en', {}))
+    
+    def translate(key, **kwargs):
+        val = translations_dict.get(key, TRANSLATIONS.get('en', {}).get(key, key))
+        if kwargs:
+            try:
+                return val.format(**kwargs)
+            except Exception:
+                return val
+        return val
+        
+    return dict(_=translate, current_lang=lang)
+
+@app.route('/set_language/<lang>')
+def set_language(lang):
+    if lang in ['en', 'hi', 'kn', 'ta', 'te', 'mr']:
+        session['lang'] = lang
+    return redirect(request.referrer or url_for('landing'))
+
 # Load Trained model and scaler
 MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
 model_path = os.path.join(MODEL_DIR, 'model.joblib')
@@ -568,8 +603,8 @@ def login_route():
                 conn.close()
                 
         elif action == 'login':
-            username = (request.form.get('username') or request.form.get('email', '')).strip()
-            password = request.form.get('password', '')
+            username = (request.form.get('username') or request.form.get('email', '') or (request.is_json and request.get_json().get('username')) or '').strip()
+            password = request.form.get('password') or (request.is_json and request.get_json().get('password')) or ''
             
             conn = get_db_connection()
             cursor = conn.cursor()
@@ -587,6 +622,9 @@ def login_route():
                 
                 flash(f"Welcome back, {user_dict['username']}! Logged in successfully.", "success")
                 
+                if request.is_json or request.headers.get('Accept') == 'application/json':
+                    return jsonify({'success': True, 'role': user_dict['role'], 'user': user_dict})
+                    
                 if user_dict['role'] == 'admin':
                     return redirect(url_for('admin_dashboard'))
                 elif user_dict['role'] == 'lender':
@@ -595,6 +633,8 @@ def login_route():
             else:
                 if user:
                     conn.close()
+                if request.is_json or request.headers.get('Accept') == 'application/json':
+                    return jsonify({'success': False, 'error': 'Invalid username or password.'}), 401
                 flash("Invalid username or password.", "error")
                 return render_template('login.html')
             
@@ -949,6 +989,27 @@ def applicant_dashboard():
     cursor.execute("SELECT COUNT(*) FROM agreements WHERE vendor_id = ? AND status = 'Completed'", (session['user_id'],))
     completed_loans_count = cursor.fetchone()[0]
 
+    # Fetch active/completed agreements
+    cursor.execute("""
+        SELECT a.id, a.agreement_code, a.application_id, a.loan_amount, a.interest_rate, a.tenure_months, a.emi_amount, a.status,
+               u.username as lender_name
+        FROM agreements a
+        JOIN users u ON a.lender_id = u.id
+        WHERE a.vendor_id = ?
+    """, (session['user_id'],))
+    agreements_rows = cursor.fetchall()
+    agreements = [dict(row) for row in agreements_rows]
+
+    # Fetch user transactions
+    cursor.execute("""
+        SELECT t.id, t.application_id, t.amount, t.currency, t.gateway_order_id, t.gateway_payment_id, t.status, t.created_at
+        FROM transactions t
+        WHERE t.user_id = ?
+        ORDER BY t.created_at DESC
+    """, (session['user_id'],))
+    tx_rows = cursor.fetchall()
+    transactions = [dict(row) for row in tx_rows]
+
     conn.close()
     
     score = compute_trust_score(session['user_id'])
@@ -963,7 +1024,9 @@ def applicant_dashboard():
         total_agreements=total_agreements,
         pending_docs_count=pending_docs_count,
         approved_loans_count=approved_loans_count,
-        completed_loans_count=completed_loans_count
+        completed_loans_count=completed_loans_count,
+        agreements=agreements,
+        transactions=transactions
     )
 
 @app.route('/apply', methods=['GET', 'POST'])
@@ -1458,10 +1521,23 @@ def create_digital_agreement(match_id):
         VALUES (?, ?, ?, ?, ?)
     ''', (agreement_id, 'FinTrust System', 'system', 'agreement_generated', f"Digital Loan Agreement {agreement_code} generated."))
     
+    # Auto-link applicant's verified Trust Verification documents to agreement_documents
+    cursor.execute("SELECT * FROM vendor_documents WHERE user_id = ? AND status = 'Verified'", (vendor_id,))
+    verified_docs = cursor.fetchall()
+    for vdoc in verified_docs:
+        doc_label = vdoc['document_type'].replace('_', ' ').title()
+        cursor.execute('''
+            INSERT INTO agreement_documents (
+                agreement_id, application_id, uploader_id, uploader_role, document_type, document_name, file_path, file_size, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            agreement_id, app_id, vendor_id, 'vendor', doc_label, vdoc['document_name'], vdoc['file_path'], 1024, 'Approved'
+        ))
+
     cursor.execute('''
         INSERT INTO notifications (user_id, title, message, type)
         VALUES (?, ?, ?, ?)
-    ''', (vendor_id, "Digital Agreement Generated", f"Your Digital Loan Agreement {agreement_code} has been generated. Please review, upload documents, and accept.", "success"))
+    ''', (vendor_id, "Digital Agreement Generated", f"Your Digital Loan Agreement {agreement_code} has been generated. Please review and accept.", "success"))
     
     cursor.execute('''
         INSERT INTO notifications (user_id, title, message, type)
@@ -1510,9 +1586,14 @@ def match_action(match_id):
     # Check if both accepted
     cursor.execute("SELECT lender_status, borrower_status FROM matches WHERE id = ?", (match_id,))
     updated_match = cursor.fetchone()
-    conn.close()
     
     both_accepted = (updated_match['lender_status'] == 'Accepted' and updated_match['borrower_status'] == 'Accepted')
+    
+    if both_accepted:
+        cursor.execute("UPDATE applications SET status = 'Approved' WHERE id = ?", (match_row['application_id'],))
+        conn.commit()
+        
+    conn.close()
     
     # Trigger digital agreement creation as soon as lender approves (or both accept)
     if action == 'Accepted' and role == 'lender':
@@ -2913,6 +2994,97 @@ def admin_document_action(doc_id):
     conn.close()
     return jsonify({'success': False, 'error': 'Invalid action'}), 400
 
+# --- Payment API Routes ---
+
+@app.route('/api/payments/create-order', methods=['POST'])
+@login_required()
+def api_create_payment_order():
+    data = request.get_json() or {}
+    amount = data.get('amount')
+    app_id = data.get('application_id')
+    
+    if not amount or not app_id:
+        return jsonify({'success': False, 'error': 'Missing amount or application_id'}), 400
+        
+    try:
+        amount_val = float(amount)
+    except ValueError:
+        return jsonify({'success': False, 'error': 'Invalid amount'}), 400
+        
+    gateway_order_id = f"order_mock_{secrets.token_hex(8)}"
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO transactions (user_id, application_id, amount, gateway_order_id, status) VALUES (?, ?, ?, ?, 'created')",
+            (session['user_id'], app_id, amount_val, gateway_order_id)
+        )
+        conn.commit()
+    except Exception as e:
+        conn.close()
+        return jsonify({'success': False, 'error': str(e)}), 500
+        
+    conn.close()
+    return jsonify({
+        'success': True,
+        'order_id': gateway_order_id,
+        'amount': amount_val,
+        'key_id': 'mock_key_fintrust_12345'
+    })
+
+@app.route('/api/payments/verify', methods=['POST'])
+@login_required()
+def api_verify_payment():
+    data = request.get_json() or {}
+    order_id = data.get('razorpay_order_id')
+    payment_id = data.get('razorpay_payment_id') or f"pay_mock_{secrets.token_hex(8)}"
+    
+    if not order_id:
+        return jsonify({'success': False, 'error': 'Missing razorpay_order_id'}), 400
+        
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    # Check if transaction exists
+    cursor.execute("SELECT * FROM transactions WHERE gateway_order_id = ?", (order_id,))
+    tx = cursor.fetchone()
+    if not tx:
+        conn.close()
+        return jsonify({'success': False, 'error': 'Transaction order not found'}), 404
+        
+    try:
+        cursor.execute(
+            "UPDATE transactions SET status = 'completed', gateway_payment_id = ? WHERE gateway_order_id = ?",
+            (payment_id, order_id)
+        )
+        # Also create a notification for user
+        title = "EMI Payment Successful"
+        message = f"Your payment of ₹{tx['amount']:,.2f} for application #AP-{tx['application_id']} was verified successfully."
+        cursor.execute(
+            "INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, 'success')",
+            (session['user_id'], title, message)
+        )
+        conn.commit()
+    except Exception as e:
+        conn.close()
+        return jsonify({'success': False, 'error': str(e)}), 500
+        
+    conn.close()
+    return jsonify({'success': True, 'message': 'Payment completed and verified successfully'})
+
+@app.route('/api/payments/history')
+@login_required()
+def api_payment_history():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id, application_id, amount, currency, gateway_order_id, gateway_payment_id, status, created_at FROM transactions WHERE user_id = ? ORDER BY id DESC",
+        (session['user_id'],)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return jsonify({'success': True, 'transactions': [dict(r) for r in rows]})
+
 recent_errors_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'error_log.txt')
 
 @app.errorhandler(Exception)
@@ -2997,6 +3169,216 @@ def dev_get_otp(email):
     row = cursor.fetchone()
     conn.close()
     return jsonify({'otp': row['otp'] if row else None})
+
+
+# --- STANDALONE REST API ENDPOINTS FOR DECOUPLED FRONTEND ---
+
+@app.route('/api/auth/me')
+def api_auth_me():
+    if 'user_id' not in session:
+        return jsonify({'authenticated': False}), 200
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, username, email, phone, role FROM users WHERE id = ?", (session['user_id'],))
+    user = cursor.fetchone()
+    if not user:
+        session.clear()
+        conn.close()
+        return jsonify({'authenticated': False}), 200
+    user_dict = dict(user)
+    trust_score = compute_trust_score(user_dict['id'])
+    user_dict['trust_score'] = trust_score
+    user_dict['trust_level'], user_dict['trust_color'] = get_trust_level(trust_score)
+    
+    # Notifications
+    cursor.execute("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 10", (user_dict['id'],))
+    notifications = [dict(row) for row in cursor.fetchall()]
+    cursor.execute("SELECT COUNT(*) as cnt FROM notifications WHERE user_id = ? AND is_read = 0", (user_dict['id'],))
+    unread_count = cursor.fetchone()['cnt']
+    conn.close()
+    
+    return jsonify({
+        'authenticated': True,
+        'user': user_dict,
+        'notifications': notifications,
+        'unread_count': unread_count
+    })
+
+@app.route('/api/auth/logout', methods=['POST', 'GET'])
+def api_auth_logout():
+    session.clear()
+    return jsonify({'success': True, 'message': 'Logged out successfully'})
+
+@app.route('/api/translations/<lang>')
+def api_get_translations(lang):
+    if lang in TRANSLATIONS:
+        return jsonify({'success': True, 'lang': lang, 'translations': TRANSLATIONS[lang]})
+    return jsonify({'success': True, 'lang': 'en', 'translations': TRANSLATIONS.get('en', {})})
+
+@app.route('/api/calculator', methods=['POST'])
+def api_calculator():
+    data = request.get_json() or {}
+    amount = float(data.get('amount', 100000))
+    rate = float(data.get('rate', 10.5))
+    tenure = int(data.get('tenure', 12))
+    income = float(data.get('income', 50000))
+    existing_emi = float(data.get('existing_emi', 0))
+    
+    emi = calculate_emi(amount, rate, tenure)
+    total_payment = emi * tenure
+    total_interest = total_payment - amount
+    rec = recommend_loan_parameters(income, existing_emi, amount)
+    
+    return jsonify({
+        'success': True,
+        'emi': round(emi, 2),
+        'total_interest': round(total_interest, 2),
+        'total_payment': round(total_payment, 2),
+        'recommendation': rec
+    })
+
+@app.route('/api/applicant/dashboard/data')
+@login_required('applicant')
+def api_applicant_dashboard_data():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM applications WHERE user_id = ? ORDER BY created_at DESC", (session['user_id'],))
+    apps = [dict(row) for row in cursor.fetchall()]
+    
+    cursor.execute("""
+        SELECT m.id as match_id, m.compatibility_score, m.reasons, m.lender_status, m.borrower_status,
+               u.id as lender_user_id, u.username as lender_name, u.email as lender_email, u.phone as lender_phone,
+               lp.interest_rate, a.id as application_id, a.loan_amount, a.loan_tenure
+        FROM matches m
+        JOIN applications a ON m.application_id = a.id
+        JOIN users u ON m.lender_id = u.id
+        LEFT JOIN lender_preferences lp ON u.id = lp.user_id
+        WHERE a.user_id = ?
+        ORDER BY m.created_at DESC
+    """, (session['user_id'],))
+    matches = [dict(row) for row in cursor.fetchall()]
+    for m in matches:
+        if m.get('reasons'):
+            try:
+                m['reasons'] = json.loads(m['reasons'])
+            except Exception:
+                pass
+                
+    cursor.execute("SELECT * FROM vendor_documents WHERE user_id = ? ORDER BY created_at DESC", (session['user_id'],))
+    docs = [dict(row) for row in cursor.fetchall()]
+    
+    trust_score = compute_trust_score(session['user_id'])
+    trust_level, trust_color = get_trust_level(trust_score)
+    conn.close()
+    
+    return jsonify({
+        'success': True,
+        'applications': apps,
+        'matches': matches,
+        'documents': docs,
+        'trust_score': trust_score,
+        'trust_level': trust_level,
+        'trust_color': trust_color
+    })
+
+@app.route('/api/lender/dashboard/data')
+@login_required('lender')
+def api_lender_dashboard_data():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT * FROM lender_preferences WHERE user_id = ?", (session['user_id'],))
+    pref = cursor.fetchone()
+    pref_dict = dict(pref) if pref else {}
+    
+    cursor.execute("""
+        SELECT m.id as match_id, m.compatibility_score, m.reasons, m.lender_status, m.borrower_status,
+               a.id as application_id, a.full_name, a.loan_amount, a.loan_tenure, a.risk_level as risk_category, a.approval_probability,
+               u.email as borrower_email
+        FROM matches m
+        JOIN applications a ON m.application_id = a.id
+        JOIN users u ON a.user_id = u.id
+        WHERE m.lender_id = ?
+        ORDER BY m.created_at DESC
+    """, (session['user_id'],))
+    matches = [dict(row) for row in cursor.fetchall()]
+    for m in matches:
+        if m.get('reasons'):
+            try:
+                m['reasons'] = json.loads(m['reasons'])
+            except Exception:
+                pass
+
+    cursor.execute("SELECT * FROM applications ORDER BY created_at DESC LIMIT 50")
+    all_apps = [dict(row) for row in cursor.fetchall()]
+    
+    conn.close()
+    return jsonify({
+        'success': True,
+        'preferences': pref_dict,
+        'matches': matches,
+        'applications': all_apps
+    })
+
+@app.route('/api/admin/dashboard/data')
+@login_required('admin')
+def api_admin_dashboard_data():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT * FROM applications ORDER BY created_at DESC")
+    apps = [dict(row) for row in cursor.fetchall()]
+    
+    cursor.execute("SELECT vd.*, u.username, u.email FROM vendor_documents vd JOIN users u ON vd.user_id = u.id ORDER BY vd.created_at DESC")
+    docs = [dict(row) for row in cursor.fetchall()]
+    
+    total_apps = len(apps)
+    approved_apps = sum(1 for a in apps if a['status'] == 'Approved')
+    pending_apps = sum(1 for a in apps if a['status'] == 'Pending')
+    rejected_apps = sum(1 for a in apps if a['status'] == 'Rejected')
+    
+    conn.close()
+    return jsonify({
+        'success': True,
+        'applications': apps,
+        'documents': docs,
+        'stats': {
+            'total': total_apps,
+            'approved': approved_apps,
+            'pending': pending_apps,
+            'rejected': rejected_apps
+        }
+    })
+
+@app.route('/api/agreements/data')
+@login_required()
+def api_agreements_data():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    user_id = session['user_id']
+    role = session.get('role')
+    
+    if role == 'lender':
+        cursor.execute("""
+            SELECT da.*, a.full_name as applicant_name, a.loan_amount, u.username as lender_name
+            FROM agreements da
+            JOIN applications a ON da.application_id = a.id
+            JOIN users u ON da.lender_id = u.id
+            WHERE da.lender_id = ?
+            ORDER BY da.created_at DESC
+        """, (user_id,))
+    else:
+        cursor.execute("""
+            SELECT da.*, a.full_name as applicant_name, a.loan_amount, u.username as lender_name
+            FROM agreements da
+            JOIN applications a ON da.application_id = a.id
+            JOIN users u ON da.lender_id = u.id
+            WHERE da.vendor_id = ?
+            ORDER BY da.created_at DESC
+        """, (user_id,))
+    agreements = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return jsonify({'success': True, 'agreements': agreements})
 
 
 

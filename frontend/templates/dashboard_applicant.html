@@ -10,27 +10,27 @@
         <ul class="sidebar-menu">
             <li>
                 <a href="/applicant/dashboard" class="sidebar-link active">
-                    <i class="fas fa-columns"></i> Portal Overview
+                    <i class="fas fa-columns"></i> {{ _('Borrower_Dashboard') }}
                 </a>
             </li>
             <li>
                 <a href="/apply" class="sidebar-link">
-                    <i class="fas fa-paper-plane"></i> Apply for Loan
+                    <i class="fas fa-paper-plane"></i> {{ _('Loan_Application_Wizard') }}
                 </a>
             </li>
             <li>
                 <a href="/agreements" class="sidebar-link">
-                    <i class="fas fa-file-signature"></i> Digital Agreements
+                    <i class="fas fa-file-signature"></i> {{ _('Agreements') }}
                 </a>
             </li>
             <li>
                 <a href="/calculator" class="sidebar-link">
-                    <i class="fas fa-calculator"></i> EMI Calculator
+                    <i class="fas fa-calculator"></i> {{ _('EMI_Calculator') }}
                 </a>
             </li>
             <li>
                 <a href="/applicant/verification" class="sidebar-link">
-                    <i class="fas fa-check-double"></i> Verify Trust
+                    <i class="fas fa-check-double"></i> {{ _('Verify_KYC') }}
                 </a>
             </li>
         </ul>
@@ -40,11 +40,11 @@
     <main class="dashboard-content">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px;">
             <div>
-                <h1 style="font-size: 1.85rem; font-weight: 700; margin-bottom: 6px; color: var(--text-primary);">Borrower Portal Overview</h1>
+                <h1 style="font-size: 1.85rem; font-weight: 700; margin-bottom: 6px; color: var(--text-primary);">{{ _('Borrower_Dashboard') }}</h1>
                 <p style="color: var(--text-secondary);">Monitor your financial checkups, trust level, and lender matchmaking.</p>
             </div>
             <a href="/apply" class="btn btn-primary">
-                <i class="fas fa-plus"></i> New Application
+                <i class="fas fa-plus"></i> {{ _('New_Application') }}
             </a>
         </div>
 
@@ -52,7 +52,7 @@
         <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px; margin-bottom: 30px;">
             <div class="glass-panel stat-card" style="padding: 20px; border-radius: 14px;">
                 <div class="stat-info">
-                    <h3 style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px;">Agreements</h3>
+                    <h3 style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px;">{{ _('Agreements') }}</h3>
                     <div class="stat-value" style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);">{{ total_agreements or 0 }}</div>
                 </div>
                 <div class="stat-icon" style="font-size: 1.5rem; color: var(--primary);">
@@ -62,7 +62,7 @@
             
             <div class="glass-panel stat-card" style="padding: 20px; border-radius: 14px;">
                 <div class="stat-info">
-                    <h3 style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px;">Pending Documents</h3>
+                    <h3 style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px;">{{ _('Pending_Documents') }}</h3>
                     <div class="stat-value" style="font-size: 1.5rem; font-weight: 700; color: #f59e0b;">{{ pending_docs_count or 0 }}</div>
                 </div>
                 <div class="stat-icon" style="font-size: 1.5rem; color: #f59e0b;">
@@ -72,7 +72,7 @@
 
             <div class="glass-panel stat-card" style="padding: 20px; border-radius: 14px;">
                 <div class="stat-info">
-                    <h3 style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px;">Approved Loans</h3>
+                    <h3 style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px;">{{ _('Approved') }}</h3>
                     <div class="stat-value" style="font-size: 1.5rem; font-weight: 700; color: #10b981;">{{ approved_loans_count or 0 }}</div>
                 </div>
                 <div class="stat-icon" style="font-size: 1.5rem; color: #10b981;">
@@ -82,7 +82,7 @@
 
             <div class="glass-panel stat-card" style="padding: 20px; border-radius: 14px;">
                 <div class="stat-info">
-                    <h3 style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px;">Completed Loans</h3>
+                    <h3 style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px;">{{ _('Completed') }}</h3>
                     <div class="stat-value" style="font-size: 1.5rem; font-weight: 700; color: #3b82f6;">{{ completed_loans_count or 0 }}</div>
                 </div>
                 <div class="stat-icon" style="font-size: 1.5rem; color: #3b82f6;">
@@ -95,7 +95,7 @@
         <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 30px; margin-bottom: 30px;">
             <!-- Profile Verification Completion -->
             <div class="glass-panel" style="padding: 25px; border-radius: 16px;">
-                <h4 style="font-weight: 700; margin-bottom: 15px; color: var(--text-primary);">Trust Profile Verification</h4>
+                <h4 style="font-weight: 700; margin-bottom: 15px; color: var(--text-primary);">{{ _('Trust_Rating') }}</h4>
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                     <span style="font-size: 0.9rem; color: var(--text-secondary);">Verification Progress</span>
                     <strong style="font-size: 1rem; color: var(--primary);">{{ trust_score }}%</strong>
@@ -107,13 +107,13 @@
                     Your profile trust rating is in the <strong>{{ trust_level }}</strong> tier. Complete your document checks (PAN, Aadhaar, salary slip, bank statement) to reach 100% and unlock lower-interest matches.
                 </div>
                 <a href="/applicant/verification" class="btn btn-outline" style="width: 100%; text-align: center; font-size: 0.85rem; padding: 10px;">
-                    <i class="fas fa-shield-halved"></i> Upload Documents
+                    <i class="fas fa-shield-halved"></i> {{ _('Upload_Docs') }}
                 </a>
             </div>
 
             <!-- Loan Underwriting Timeline -->
             <div class="glass-panel" style="padding: 25px; border-radius: 16px;">
-                <h4 style="font-weight: 700; margin-bottom: 15px; color: var(--text-primary);">Application Process Timeline</h4>
+                <h4 style="font-weight: 700; margin-bottom: 15px; color: var(--text-primary);">{{ _('Application_Timeline') }}</h4>
                 {% if apps %}
                     {% set latest = apps[0] %}
                     <div style="display: flex; flex-direction: column; gap: 15px;">
@@ -198,10 +198,10 @@
                     <i class="fas fa-circle-xmark"></i>
                 </div>
             </div>
-
+            
             <div class="glass-panel stat-card" style="border-left: 4px solid var(--primary); cursor: pointer;" onclick="location.href='/applicant/verification'">
                 <div class="stat-info">
-                    <h3>Trust Rating</h3>
+                    <h3>{{ _('Trust_Rating') }}</h3>
                     <div class="stat-value" style="display: flex; align-items: baseline; gap: 6px;">
                         <span>{{ trust_score }}</span>
                         <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">({{ trust_level }})</span>
@@ -216,7 +216,7 @@
         <!-- P2P Lending Match Panel -->
         <div class="glass-panel" style="padding: 25px; border-radius: 16px; margin-bottom: 30px;">
             <h3 style="font-weight: 700; font-size: 1.25rem; margin-bottom: 20px; color: var(--text-primary); display: flex; align-items: center; gap: 10px;">
-                <i class="fas fa-handshake" style="color: var(--primary);"></i> My Lending Matches
+                <i class="fas fa-handshake" style="color: var(--primary);"></i> {{ _('Active_Matches') }}
             </h3>
             
             {% if matches %}
@@ -225,13 +225,13 @@
                         <div class="glass-panel" style="padding: 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02);">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                                 <div style="display: flex; align-items: center; gap: 8px;">
-                                    <span style="font-weight: 700; font-size: 1.05rem; color: var(--text-primary);">Lender: {{ match.lender_name }}</span>
+                                    <span style="font-weight: 700; font-size: 1.05rem; color: var(--text-primary);">{{ _('Lender') }}: {{ match.lender_name }}</span>
                                     <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-size: 0.75rem; font-weight: 600; border: 1px solid rgba(16,185,129,0.2);">
                                         Trust: {{ match.lender_trust_score }}/100
                                     </span>
                                 </div>
                                 <div class="badge" style="background: rgba(59, 130, 246, 0.15); color: #3b82f6; font-size: 0.8rem; font-weight: 600;">
-                                    {{ match.compatibility_score }}% Match
+                                    {{ match.compatibility_score }}% {{ _('Compatibility_Score') }}
                                 </div>
                             </div>
                             
@@ -291,7 +291,7 @@
                                             data-lender-id="{{ match.lender_user_id }}"
                                             onclick="openLenderTrustModal(this)"
                                             style="width: 100%; padding: 8px; font-size: 0.8rem; background: rgba(59, 130, 246, 0.12); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: var(--transition);">
-                                        <i class="fas fa-shield-halved"></i> Verify Lender Trust
+                                        <i class="fas fa-shield-halved"></i> {{ _('Verify_Trust') }}
                                     </button>
                                     
                                     <div style="display: flex; gap: 10px;">
@@ -299,13 +299,13 @@
                                             <form action="/api/matches/{{ match.match_id }}/action" method="POST" style="flex: 1; margin: 0;">
                                                 <input type="hidden" name="action" value="Accepted">
                                                 <button type="submit" class="btn btn-primary" style="width: 100%; padding: 8px; font-size: 0.8rem; height: 100%;">
-                                                    <i class="fas fa-check"></i> Accept Match
+                                                    <i class="fas fa-check"></i> {{ _('Action_Accept') }}
                                                 </button>
                                             </form>
                                             <form action="/api/matches/{{ match.match_id }}/action" method="POST" style="flex: 1; margin: 0;">
                                                 <input type="hidden" name="action" value="Rejected">
                                                 <button type="submit" class="btn btn-secondary" style="width: 100%; padding: 8px; font-size: 0.8rem; background: rgba(239, 68, 68, 0.15); color: #ef4444; border-color: rgba(239,68,68,0.2); height: 100%;">
-                                                    <i class="fas fa-times"></i> Decline
+                                                    <i class="fas fa-times"></i> {{ _('Action_Reject') }}
                                                 </button>
                                             </form>
                                         {% elif match.borrower_status == 'Accepted' %}
@@ -403,6 +403,94 @@
                         <h4>No Applications Found</h4>
                         <p style="color: var(--text-muted); margin-bottom: 20px;">You haven't run any financial assessments yet.</p>
                         <a href="/apply" class="btn btn-primary">Run First Assessment</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- EMI Repayments & Transaction History Grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; margin-top: 30px; margin-bottom: 30px;">
+            <!-- EMI Repayments Card -->
+            <div class="glass-panel" style="padding: 25px; border-radius: 16px;">
+                <h3 style="font-weight: 700; font-size: 1.2rem; margin-bottom: 20px; color: var(--text-primary); display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-money-bill-wave" style="color: #10b981;"></i> Active EMI Repayments
+                </h3>
+                
+                {% if agreements %}
+                    <div style="display: flex; flex-direction: column; gap: 15px;">
+                        {% for agr in agreements %}
+                            <div style="padding: 16px; border-radius: 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary); margin-bottom: 4px;">
+                                        EMI for Agreement: <span style="color: var(--primary);">{{ agr.agreement_code }}</span>
+                                    </div>
+                                    <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 2px;">
+                                        Lender: <strong>{{ agr.lender_name }}</strong> &nbsp;|&nbsp; Rate: <strong>{{ agr.interest_rate }}%</strong>
+                                    </div>
+                                    <div style="font-size: 0.8rem; color: var(--text-muted);">
+                                        Next Due Date: <strong>5th of next month</strong>
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="font-weight: 800; font-size: 1.1rem; color: #10b981; margin-bottom: 8px;">
+                                        ₹{{ "{:,.2f}".format(agr.emi_amount) }}
+                                    </div>
+                                    <button class="btn btn-primary" 
+                                            onclick="window.openMockPaymentModal({{ agr.emi_amount }}, {{ agr.application_id }}, () => { location.reload(); })"
+                                            style="padding: 6px 14px; font-size: 0.8rem; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none;">
+                                        <i class="fas fa-credit-card"></i> Pay EMI
+                                    </button>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div style="text-align: center; padding: 30px; color: var(--text-muted);">
+                        <i class="fas fa-calendar-times" style="font-size: 2.2rem; margin-bottom: 12px; color: rgba(255,255,255,0.08);"></i>
+                        <p style="font-size: 0.85rem; margin: 0;">No active loan agreements found requiring EMI repayments.</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Transaction History Card -->
+            <div class="glass-panel" style="padding: 25px; border-radius: 16px;">
+                <h3 style="font-weight: 700; font-size: 1.2rem; margin-bottom: 20px; color: var(--text-primary); display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-receipt" style="color: var(--primary);"></i> Repayment Transactions
+                </h3>
+                
+                {% if transactions %}
+                    <div style="max-height: 250px; overflow-y: auto; padding-right: 5px;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; text-align: left;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.08); color: var(--text-muted);">
+                                    <th style="padding: 8px 4px;">Txn ID</th>
+                                    <th style="padding: 8px 4px;">Ref</th>
+                                    <th style="padding: 8px 4px;">Amount</th>
+                                    <th style="padding: 8px 4px;">Status</th>
+                                    <th style="padding: 8px 4px;">Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tx in transactions %}
+                                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); color: var(--text-secondary);">
+                                        <td style="padding: 10px 4px;"><strong>#TX-{{ tx.id }}</strong></td>
+                                        <td style="padding: 10px 4px;">#AP-{{ tx.application_id }}</td>
+                                        <td style="padding: 10px 4px; font-weight: 600; color: #10b981;">₹{{ "{:,.2f}".format(tx.amount) }}</td>
+                                        <td style="padding: 10px 4px;">
+                                            <span class="badge {% if tx.status == 'completed' %}badge-approved{% else %}badge-pending{% endif %}" style="font-size: 0.7rem; padding: 2px 6px;">
+                                                {{ tx.status }}
+                                            </span>
+                                        </td>
+                                        <td style="padding: 10px 4px; font-size: 0.75rem; color: var(--text-muted);">{{ tx.created_at[:16] }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div style="text-align: center; padding: 30px; color: var(--text-muted);">
+                        <i class="fas fa-receipt" style="font-size: 2.2rem; margin-bottom: 12px; color: rgba(255,255,255,0.08);"></i>
+                        <p style="font-size: 0.85rem; margin: 0;">No transaction records found.</p>
                     </div>
                 {% endif %}
             </div>

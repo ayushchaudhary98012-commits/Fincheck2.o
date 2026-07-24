@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinTrust | Verify Trust & KYC Documents</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="static/css/styles.css">
+    <script>
+        (function() {
+            const storedTheme = localStorage.getItem('fintrust_theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', storedTheme);
+        })();
+    </script>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="index.html" class="nav-brand">
+            <i class="fas fa-shield-halved"></i>
+            <span>Fin</span> Trust
+        </a>
+        <ul class="nav-menu">
+            <li><a href="index.html" class="nav-link">Home</a></li>
+            <li><a href="calculator.html" class="nav-link">EMI Calculator</a></li>
+            <li><a href="verification.html" class="nav-link active">Verify Trust</a></li>
+        </ul>
+        <div class="nav-actions">
+            <button id="theme-toggle-btn" class="theme-toggle"><i class="fas fa-moon"></i></button>
+            <div id="nav-auth-section"></div>
+        </div>
+    </nav>
+
+    <main class="main-content" style="max-width: 900px; margin: 40px auto; padding: 0 20px;">
+        <div style="margin-bottom: 30px; text-align: center;">
+            <h1 style="font-size: 2.2rem; font-weight: 800; color: var(--text-primary);">Trust Score & Document Verification</h1>
+            <p style="color: var(--text-secondary);">Upload official documents to increase your credibility score and unlock higher credit limits.</p>
+        </div>
+
+        <div class="glass-panel" style="padding: 35px; border-radius: 20px; margin-bottom: 30px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <div>
+                    <h3 style="font-size: 1.3rem; font-weight: 700; color: var(--text-primary);">Your Current Trust Rating</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-muted);">Verified credentials add +10 to +15 score points each.</p>
+                </div>
+                <div style="text-align: right;">
+                    <div id="trust-score-badge" style="font-size: 2.5rem; font-weight: 800; color: var(--primary);">--</div>
+                    <div id="trust-level-name" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Level: Loading</div>
+                </div>
+            </div>
+
+            <!-- Upload Form -->
+            <form id="upload-form" style="border-top: 1px solid var(--glass-border); padding-top: 24px;">
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Select Document Type</label>
+                    <select id="doc-type" class="form-control" style="width: 100%; padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid var(--glass-border);" required>
+                        <option value="pan_verification">PAN Card Verification (+15 Score)</option>
+                        <option value="aadhaar_verification">Aadhaar Verification (+15 Score)</option>
+                        <option value="bank_statement">Bank Statement (+15 Score)</option>
+                        <option value="salary_slip">Salary Slip / Income Proof (+15 Score)</option>
+                        <option value="business_registration">Business Registration (+10 Score)</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 24px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Upload File (PDF / PNG / JPG)</label>
+                    <input type="file" id="doc-file" accept=".pdf,.png,.jpg,.jpeg" required style="width: 100%; padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px dashed var(--glass-border);">
+                </div>
+
+                <button type="submit" id="btn-upload" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 600;">
+                    <i class="fas fa-upload" style="margin-right: 6px;"></i> Submit for Verification
+                </button>
+            </form>
+        </div>
+    </main>
+
+    <script src="static/js/config.js"></script>
+    <script src="static/js/app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            async function loadTrustScore() {
+                try {
+                    const res = await apiFetch('/api/vendor/trust-score');
+                    if (res.ok) {
+                        const data = await res.json();
+                        document.getElementById('trust-score-badge').innerText = `${data.trust_score}`;
+                        document.getElementById('trust-score-badge').style.color = data.color || '#3b82f6';
+                        document.getElementById('trust-level-name').innerText = `Level: ${data.level}`;
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+
+            await loadTrustScore();
+
+            document.getElementById('upload-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const docType = document.getElementById('doc-type').value;
+                const fileInput = document.getElementById('doc-file');
+                if (!fileInput.files[0]) return;
+
+                const submitBtn = document.getElementById('btn-upload');
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading & Verifying...';
+
+                const formData = new FormData();
+                formData.append('document_type', docType);
+                formData.append('file', fileInput.files[0]);
+
+                try {
+                    const res = await apiFetch('/api/vendor/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        showToast('Document uploaded and verified!', 'success');
+                        fileInput.value = '';
+                        await loadTrustScore();
+                    } else {
+                        showToast(data.error || 'Upload failed.', 'error');
+                    }
+                } catch (err) {
+                    showToast('Document verification request failed.', 'error');
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-upload"></i> Submit for Verification';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

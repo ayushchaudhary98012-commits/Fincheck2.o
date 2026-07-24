@@ -5,33 +5,33 @@
 {% block content %}
 <div class="glass-panel form-container">
     <div style="display: flex; border-bottom: 1px solid var(--glass-border); margin-bottom: 30px;">
-        <button id="tab-login" class="btn" style="flex: 1; border-radius: 0; background: none; border-bottom: 2px solid var(--primary); font-weight: 600; color: var(--primary);">Login</button>
-        <button id="tab-register" class="btn" style="flex: 1; border-radius: 0; background: none; border-bottom: 2px solid transparent; font-weight: 500; color: var(--text-secondary);">Register</button>
+        <button id="tab-login" class="btn" style="flex: 1; border-radius: 0; background: none; border-bottom: 2px solid var(--primary); font-weight: 600; color: var(--primary);">{{ _('Login') }}</button>
+        <button id="tab-register" class="btn" style="flex: 1; border-radius: 0; background: none; border-bottom: 2px solid transparent; font-weight: 500; color: var(--text-secondary);">{{ _('Register_Now') }}</button>
     </div>
     
     <!-- Login Form -->
     <form id="form-login" style="display: block;" action="/login" method="POST">
         <input type="hidden" name="action" value="login">
         <div class="form-header">
-            <h2>Welcome Back</h2>
-            <p>Access your applicant portal or lender dashboard.</p>
+            <h2>{{ _('Welcome_Back') }}</h2>
+            <p>{{ _('Enter_Details') }}</p>
         </div>
         
         <div class="form-group">
-            <label for="login-email">Email Address</label>
-            <input type="email" id="login-email" name="username" class="form-control" placeholder="Enter your email" required>
+            <label for="login-email">{{ _('Email_Address') }}</label>
+            <input type="email" id="login-email" name="username" class="form-control" placeholder="{{ _('Email_Address') }}" required>
         </div>
         
         <div class="form-group">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <label for="login-password">Password</label>
+                <label for="login-password">{{ _('Password') }}</label>
                 <a href="#" id="link-forgot-password" style="font-size: 0.8rem; color: var(--primary); text-decoration: none;">Forgot Password?</a>
             </div>
-            <input type="password" id="login-password" name="password" class="form-control" placeholder="Enter your password" required>
+            <input type="password" id="login-password" name="password" class="form-control" placeholder="{{ _('Password') }}" required>
         </div>
         
         <button type="submit" id="btn-login-submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">
-            <i class="fas fa-sign-in-alt"></i> Login
+            <i class="fas fa-sign-in-alt"></i> {{ _('Login') }}
         </button>
     </form>
     
@@ -43,8 +43,8 @@
         </div>
         
         <div class="form-group">
-            <label for="forgot-email">Email Address</label>
-            <input type="email" id="forgot-email" name="email" class="form-control" placeholder="Enter your registered email" required>
+            <label for="forgot-email">{{ _('Email_Address') }}</label>
+            <input type="email" id="forgot-email" name="email" class="form-control" placeholder="{{ _('Email_Address') }}" required>
         </div>
         
         <button type="submit" id="btn-forgot-submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">
@@ -60,46 +60,46 @@
     <form id="form-register" style="display: none;" action="/login" method="POST">
         <input type="hidden" name="action" value="register">
         <div class="form-header">
-            <h2>Create Account</h2>
-            <p>Join FinTrust and check your eligibility instantly.</p>
+            <h2>{{ _('Register_Account') }}</h2>
+            <p>{{ _('Join_FinTrust') }}</p>
         </div>
         
         <div class="form-group">
-            <label for="reg-username">Username</label>
-            <input type="text" id="reg-username" name="username" class="form-control" placeholder="Choose a username" required>
+            <label for="reg-username">{{ _('Username') }}</label>
+            <input type="text" id="reg-username" name="username" class="form-control" placeholder="{{ _('Username') }}" required>
         </div>
         
         <div class="form-group">
-            <label for="reg-email">Email Address</label>
+            <label for="reg-email">{{ _('Email_Address') }}</label>
             <input type="email" id="reg-email" name="email" class="form-control" placeholder="name@example.com" required>
         </div>
         
         <div class="form-group">
-            <label for="reg-phone">Phone Number</label>
-            <input type="tel" id="reg-phone" name="phone" class="form-control" placeholder="e.g. +1 555-0199" required>
+            <label for="reg-phone">{{ _('Phone_Number') }}</label>
+            <input type="tel" id="reg-phone" name="phone" class="form-control" placeholder="+91..." required>
         </div>
         
         <div class="form-group">
-            <label for="reg-role">Account Type</label>
+            <label for="reg-role">{{ _('Select_Role') }}</label>
             <select id="reg-role" name="role" class="form-control" required>
-                <option value="applicant">Applicant / Vendor</option>
-                <option value="lender">Lender / Admin</option>
+                <option value="applicant">{{ _('Borrower') }}</option>
+                <option value="lender">{{ _('Lender') }}</option>
             </select>
         </div>
         
         <div class="form-row">
             <div class="form-group">
-                <label for="reg-password">Password</label>
-                <input type="password" id="reg-password" name="password" class="form-control" placeholder="Create password" required>
+                <label for="reg-password">{{ _('Password') }}</label>
+                <input type="password" id="reg-password" name="password" class="form-control" placeholder="{{ _('Password') }}" required>
             </div>
             <div class="form-group">
-                <label for="reg-confirm">Confirm Password</label>
-                <input type="password" id="reg-confirm" name="confirm_password" class="form-control" placeholder="Repeat password" required>
+                <label for="reg-confirm">{{ _('Confirm_Password') }}</label>
+                <input type="password" id="reg-confirm" name="confirm_password" class="form-control" placeholder="{{ _('Confirm_Password') }}" required>
             </div>
         </div>
         
         <button type="submit" id="btn-register-submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">
-            <i class="fas fa-user-plus"></i> Register
+            <i class="fas fa-user-plus"></i> {{ _('Register_Now') }}
         </button>
     </form>
 </div>

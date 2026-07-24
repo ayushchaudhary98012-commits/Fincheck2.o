@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinTrust | Interactive Loan EMI Calculator</title>
+    <meta name="description" content="Calculate your monthly installment, principal amount, and total interest with FinTrust's interactive EMI calculator.">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="static/css/styles.css">
+    <script>
+        (function() {
+            const storedTheme = localStorage.getItem('fintrust_theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', storedTheme);
+        })();
+    </script>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <a href="index.html" class="nav-brand">
+            <i class="fas fa-shield-halved"></i>
+            <span>Fin</span> Trust
+        </a>
+        
+        <ul class="nav-menu">
+            <li><a href="index.html" class="nav-link">Home</a></li>
+            <li><a href="calculator.html" class="nav-link active">EMI Calculator</a></li>
+            <li><a href="agreements.html" class="nav-link">Agreements</a></li>
+            <li><a href="verification.html" class="nav-link">Verify Trust</a></li>
+        </ul>
+        
+        <div class="nav-actions">
+            <!-- Language Dropdown Selector -->
+            <select id="language-select" class="theme-toggle" style="height: 38px; padding: 0 10px; border-radius: 8px; background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid rgba(255,255,255,0.1); cursor: pointer;">
+                <option value="en" selected>English</option>
+                <option value="hi">हिन्दी</option>
+                <option value="kn">ಕನ್ನಡ</option>
+                <option value="ta">தமிழ்</option>
+                <option value="te">తెలుగు</option>
+                <option value="mr">मराठी</option>
+            </select>
+
+            <button id="theme-toggle-btn" class="theme-toggle" title="Toggle Light/Dark Theme">
+                <i class="fas fa-moon"></i>
+            </button>
+            
+            <div id="nav-auth-section">
+                <a href="login.html" class="btn btn-outline" style="padding: 8px 16px; font-size: 0.85rem;">Login</a>
+                <a href="login.html?register=true" class="btn btn-primary" style="padding: 8px 16px; font-size: 0.85rem;">Register Now</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Container -->
+    <main class="main-content" style="max-width: 1100px; margin: 40px auto; padding: 0 20px;">
+        <div class="glass-panel calculator-container" style="padding: 40px; border-radius: 20px;">
+            <div class="form-header" style="margin-bottom: 30px;">
+                <h2 style="font-size: 2rem; font-weight: 800; margin-bottom: 8px; color: var(--text-primary);">Interactive EMI Calculator</h2>
+                <p style="color: var(--text-secondary);">Calculate your estimated monthly payments, total interest payable, and plan your loan amortization details.</p>
+            </div>
+            
+            <div class="calc-grid" style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 40px; align-items: start;">
+                <!-- Sliders Column -->
+                <div>
+                    <!-- Amount -->
+                    <div class="slider-group" style="margin-bottom: 24px;">
+                        <div class="slider-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <span style="font-weight: 600;">Loan Amount</span>
+                            <div class="input-inline-wrap" style="display: flex; align-items: center; gap: 4px;">
+                                <span class="currency-symbol" style="font-weight: 600; color: var(--primary);">₹</span>
+                                <input type="number" id="calc-amount-input" class="inline-calc-input" min="5000" max="10000000" step="1000" value="100000" style="padding: 6px 10px; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05); color: var(--text-primary); font-weight: 600; width: 120px;">
+                            </div>
+                        </div>
+                        <input type="range" id="calc-amount" class="range-slider" min="5000" max="2000000" step="5000" value="100000" style="width: 100%;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">
+                            <span>Min: ₹5k</span>
+                            <span>Max: ₹2,000k</span>
+                        </div>
+                        
+                        <!-- Quick Select Chips -->
+                        <div class="quick-select-chips" style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px;">
+                            <button class="chip-btn" data-value="50000">₹50k</button>
+                            <button class="chip-btn active" data-value="100000">₹1 Lakh</button>
+                            <button class="chip-btn" data-value="200000">₹2 Lakh</button>
+                            <button class="chip-btn" data-value="500000">₹5 Lakh</button>
+                            <button class="chip-btn" data-value="1000000">₹10 Lakh</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Rate -->
+                    <div class="slider-group" style="margin-bottom: 24px;">
+                        <div class="slider-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <span style="font-weight: 600;">Annual Interest Rate</span>
+                            <div class="input-inline-wrap" style="display: flex; align-items: center; gap: 4px;">
+                                <input type="number" id="calc-rate-input" class="inline-calc-input" min="0.1" max="30" step="0.1" value="9.0" style="padding: 6px 10px; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05); color: var(--text-primary); font-weight: 600; width: 70px;">
+                                <span class="currency-symbol" style="font-weight: 600; color: var(--primary);">%</span>
+                            </div>
+                        </div>
+                        <input type="range" id="calc-rate" class="range-slider" min="1" max="25" step="0.1" value="9.0" style="width: 100%;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">
+                            <span>Min: 1%</span>
+                            <span>Max: 25%</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Tenure -->
+                    <div class="slider-group" style="margin-bottom: 24px;">
+                        <div class="slider-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <span style="font-weight: 600;">Loan Tenure</span>
+                            <div class="input-inline-wrap" style="display: flex; align-items: center; gap: 4px;">
+                                <input type="number" id="calc-tenure-input" class="inline-calc-input" min="1" max="10" step="1" value="5" style="padding: 6px 10px; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05); color: var(--text-primary); font-weight: 600; width: 60px;">
+                                <span class="currency-symbol" style="font-weight: 600; color: var(--text-muted); font-size: 0.85rem;">Yrs</span>
+                            </div>
+                        </div>
+                        <input type="range" id="calc-tenure" class="range-slider" min="1" max="10" step="1" value="5" style="width: 100%;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">
+                            <span>Min: 1 Yr</span>
+                            <span>Max: 10 Yrs (120 Mos)</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Results Column -->
+                <div class="glass-panel calc-result-card" style="padding: 30px; border-radius: 16px; background: rgba(255,255,255,0.03);">
+                    <div class="calc-emi-display" style="text-align: center; margin-bottom: 24px;">
+                        <h4 style="font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 1px;">Monthly Repayment</h4>
+                        <div id="calc-emi-val" class="emi-val" style="font-size: 2.5rem; font-weight: 800; color: var(--primary);">₹2,076</div>
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Based on standard amortization rates</p>
+                    </div>
+                    
+                    <div class="calc-breakdown" style="display: flex; flex-direction: column; gap: 12px;">
+                        <div class="breakdown-row" style="display: flex; justify-content: space-between; font-size: 0.9rem;">
+                            <span>Principal Amount:</span>
+                            <span id="calc-principal-val" style="font-weight: 600;">₹100,000</span>
+                        </div>
+                        <div class="breakdown-row" style="display: flex; justify-content: space-between; font-size: 0.9rem;">
+                            <span>Total Interest Payable:</span>
+                            <span id="calc-interest-val" style="color: var(--warning); font-weight: 600;">₹24,550</span>
+                        </div>
+                        <div style="height: 1px; background-color: var(--glass-border); margin: 8px 0;"></div>
+                        <div class="breakdown-row" style="display: flex; justify-content: space-between; font-size: 1.1rem; font-weight: 700;">
+                            <span style="color: var(--text-primary);">Total Repayment:</span>
+                            <span id="calc-total-val" style="color: var(--primary); font-weight: 700;">₹124,550</span>
+                        </div>
+                    </div>
+                    
+                    <a href="login.html" class="btn btn-primary" style="margin-top: 30px; width: 100%; padding: 12px; font-weight: 600; text-align: center; display: block;">
+                        Apply for a Loan Now <i class="fas fa-arrow-right" style="margin-left: 6px;"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div>&copy; 2026 FinTrust Financial Corp. All rights reserved.</div>
+        <div style="display: flex; gap: 20px;">
+            <a href="#" style="color: var(--text-muted); text-decoration: none;">Privacy Policy</a>
+            <a href="#" style="color: var(--text-muted); text-decoration: none;">Terms of Service</a>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="static/js/config.js"></script>
+    <script src="static/js/app.js"></script>
+    <script src="static/js/main.js"></script>
+    <script src="static/js/calculator.js"></script>
+</body>
+</html>

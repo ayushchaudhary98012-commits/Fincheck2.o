@@ -181,6 +181,35 @@ def init_db():
         )
     ''')
 
+    # Migration check for agreements table columns
+    cursor.execute("PRAGMA table_info(agreements)")
+    existing_agr_cols = [col[1] for col in cursor.fetchall()]
+    agr_cols_needed = {
+        'agreement_code': "TEXT",
+        'match_id': "INTEGER",
+        'application_id': "INTEGER",
+        'lender_id': "INTEGER",
+        'vendor_id': "INTEGER",
+        'loan_amount': "REAL",
+        'interest_rate': "REAL DEFAULT 10.5",
+        'tenure_months': "INTEGER",
+        'emi_amount': "REAL",
+        'processing_fee': "REAL DEFAULT 0.0",
+        'status': "TEXT DEFAULT 'Pending'",
+        'vendor_consent': "INTEGER DEFAULT 0",
+        'vendor_consent_at': "TIMESTAMP",
+        'vendor_ip': "TEXT",
+        'lender_consent': "INTEGER DEFAULT 0",
+        'lender_consent_at': "TIMESTAMP",
+        'lender_ip': "TEXT"
+    }
+    for col_name, col_type in agr_cols_needed.items():
+        if col_name not in existing_agr_cols:
+            try:
+                cursor.execute(f"ALTER TABLE agreements ADD COLUMN {col_name} {col_type}")
+            except Exception:
+                pass
+
     # Create Agreement Documents table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS agreement_documents (
@@ -201,6 +230,27 @@ def init_db():
         )
     ''')
 
+    # Migration check for agreement_documents
+    cursor.execute("PRAGMA table_info(agreement_documents)")
+    existing_doc_cols = [col[1] for col in cursor.fetchall()]
+    doc_cols_needed = {
+        'agreement_id': "INTEGER",
+        'application_id': "INTEGER",
+        'uploader_id': "INTEGER",
+        'uploader_role': "TEXT",
+        'document_name': "TEXT",
+        'document_type': "TEXT",
+        'file_path': "TEXT",
+        'file_size': "INTEGER DEFAULT 0",
+        'status': "TEXT DEFAULT 'Pending'"
+    }
+    for col_name, col_type in doc_cols_needed.items():
+        if col_name not in existing_doc_cols:
+            try:
+                cursor.execute(f"ALTER TABLE agreement_documents ADD COLUMN {col_name} {col_type}")
+            except Exception:
+                pass
+
     # Create Agreement Timeline table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS agreement_timeline (
@@ -212,6 +262,23 @@ def init_db():
             description TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (agreement_id) REFERENCES agreements(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # Create Transactions table (Payment Gateway Integration)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            application_id INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            currency TEXT DEFAULT 'INR',
+            gateway_order_id TEXT NOT NULL,
+            gateway_payment_id TEXT,
+            status TEXT DEFAULT 'created',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE
         )
     ''')
 

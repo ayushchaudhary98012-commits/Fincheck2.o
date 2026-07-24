@@ -8,11 +8,11 @@
         <h1 style="font-size: 2.2rem; font-weight: 800; color: var(--text-primary);">
             Application Status: 
             {% if status == 'Approved' %}
-                <span style="color: var(--success);">Approved</span>
+                <span style="color: var(--success);">{{ _('Approved') }}</span>
             {% elif status == 'Moderate' %}
-                <span style="color: var(--warning);">Moderate Eligibility</span>
+                <span style="color: var(--warning);">{{ _('Moderate') }}</span>
             {% else %}
-                <span style="color: var(--danger);">Rejected</span>
+                <span style="color: var(--danger);">{{ _('Rejected') }}</span>
             {% endif %}
         </h1>
         <p style="color: var(--text-secondary);">Real-time AI credit assessment for <strong>{{ app.full_name }}</strong> (Ref: #AP-{{ app.id }})</p>
@@ -34,7 +34,7 @@
     <div class="result-grid" style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 30px; margin-bottom: 30px;">
         <!-- Left: Score Card -->
         <div class="glass-panel score-gauge-card" style="padding: 30px; border-radius: 18px; display: flex; flex-direction: column; align-items: center;">
-            <h3 style="font-weight: 700; color: var(--text-secondary); margin-bottom: 20px; font-size: 1.1rem; text-transform: uppercase;">Eligibility Score</h3>
+            <h3 style="font-weight: 700; color: var(--text-secondary); margin-bottom: 20px; font-size: 1.1rem; text-transform: uppercase;">{{ _('Eligibility_Score') }}</h3>
             
             <div class="gauge-chart-container" style="position: relative; width: 160px; height: 160px; display: flex; align-items: center; justify-content: center; margin-bottom: 25px;">
                 <canvas id="gauge-chart" data-score="{{ app.eligibility_score }}" style="position: absolute; top:0; left:0; width:100%; height:100%;"></canvas>
@@ -51,11 +51,16 @@
             
             <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 10px; width: 100%;">
                 <div style="display: flex; justify-content: space-between; font-size: 0.95rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 8px;">
-                    <span style="color: var(--text-secondary);">Risk Level:</span>
+                    <span style="color: var(--text-secondary);">{{ _('Risk_Level') }}:</span>
                     <strong style="color: 
                         {% if app.risk_level == 'Low' %}var(--success)
                         {% elif app.risk_level == 'Medium' %}var(--warning)
-                        {% else %}var(--danger){% endif %};">{{ app.risk_level }}</strong>
+                        {% else %}var(--danger){% endif %};">
+                        {% if app.risk_level == 'Low' %}{{ _('Low') }}
+                        {% elif app.risk_level == 'Medium' %}{{ _('Medium') }}
+                        {% elif app.risk_level == 'High' %}{{ _('High') }}
+                        {% else %}{{ app.risk_level }}{% endif %}
+                    </strong>
                 </div>
                 
                 <div style="display: flex; justify-content: space-between; font-size: 0.95rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 8px;">
@@ -64,17 +69,17 @@
                 </div>
                 
                 <div style="display: flex; justify-content: space-between; font-size: 0.95rem; padding-bottom: 8px;">
-                    <span style="color: var(--text-secondary);">Requested Loan:</span>
+                    <span style="color: var(--text-secondary);">{{ _('Requested_Amount') }}:</span>
                     <strong>₹{{ "{:,.2f}".format(app.loan_amount) }}</strong>
                 </div>
             </div>
             
             <div style="margin-top: 24px; display: flex; flex-direction: column; gap: 12px; width: 100%;">
                 <a href="/api/applications/{{ app.id }}/pdf" class="btn btn-primary" style="width: 100%; text-align: center;">
-                    <i class="fas fa-file-pdf"></i> Download PDF Report
+                    <i class="fas fa-file-pdf"></i> {{ _('Download_Report') }}
                 </a>
                 <a href="/applicant/dashboard" class="btn btn-secondary" style="width: 100%; text-align: center; background: rgba(255,255,255,0.05);">
-                    <i class="fas fa-columns"></i> Go to Dashboard
+                    <i class="fas fa-columns"></i> {{ _('Borrower_Dashboard') }}
                 </a>
             </div>
         </div>
@@ -83,14 +88,14 @@
         <div class="glass-panel analysis-card" style="padding: 30px; border-radius: 18px;">
             <!-- Progress Ratios -->
             <div class="analysis-title" style="font-weight: 700; font-size: 1.15rem; color: var(--text-primary); margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
-                <i class="fas fa-chart-simple" style="color: var(--primary);"></i> Financial Health Indicators
+                <i class="fas fa-chart-simple" style="color: var(--primary);"></i> {{ _('Financial_Summary') }}
             </div>
             
             <div style="display: flex; flex-direction: column; gap: 20px; margin-bottom: 35px;">
                 <!-- Debt to Income -->
                 <div>
                     <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.9rem;">
-                        <span style="font-weight: 500;">Debt-to-Income (DTI) Ratio</span>
+                        <span style="font-weight: 500;">{{ _('DTI_Ratio') }}</span>
                         <strong style="color: {% if ratios.dti <= 0.36 %}var(--success){% elif ratios.dti <= 0.5 %}var(--warning){% else %}var(--danger){% endif %};">
                             {{ "%.1f"|format(ratios.dti * 100) }}%
                         </strong>
@@ -104,7 +109,7 @@
                 <!-- Loan to Annual Income -->
                 <div>
                     <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.9rem;">
-                        <span style="font-weight: 500;">Loan-to-Annual Income Ratio</span>
+                        <span style="font-weight: 500;">{{ _('LTI_Ratio') }}</span>
                         <strong style="color: {% if ratios.lti <= 3.0 %}var(--success){% elif ratios.lti <= 5.0 %}var(--warning){% else %}var(--danger){% endif %};">
                             {{ "%.1f"|format(ratios.lti) }}x
                         </strong>
@@ -118,7 +123,7 @@
             
             <!-- XAI Reasons -->
             <div class="analysis-title" style="font-weight: 700; font-size: 1.15rem; color: var(--text-primary); margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
-                <i class="fas fa-brain" style="color: var(--primary);"></i> Explainable AI (XAI) Risk Factors
+                <i class="fas fa-brain" style="color: var(--primary);"></i> {{ _('AI_Reasoning') }}
             </div>
             
             <ul class="reasons-list" style="list-style: none; padding: 0; margin: 0 0 25px 0; display: flex; flex-direction: column; gap: 10px;">
@@ -173,10 +178,10 @@
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
             <h3 style="font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 8px; color: var(--text-primary);">
                 <i class="fas fa-shield-halved" style="color: var(--primary);"></i>
-                Document Verification & Trust Integrity
+                {{ _('KYC_Documents') }}
             </h3>
             <span class="badge" style="background-color: {{ trust_color }}; color: white; font-weight: 600; padding: 6px 12px; font-size: 0.85rem;">
-                Trust Score: {{ trust_score }} / 100 ({{ trust_level }})
+                {{ _('Trust_Rating') }}: {{ trust_score }} / 100 ({{ trust_level }})
             </span>
         </div>
         

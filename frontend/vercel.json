@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "name": "fintrust-frontend",
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "https://fintrust-backend-api.onrender.com/api/$1" }
+  ]
+}
