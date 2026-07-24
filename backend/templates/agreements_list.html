@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}FinTrust | Digital Agreements{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; padding: 0 16px; margin-bottom: 15px;">Menu</div>
+        <ul class="sidebar-menu">
+            <li>
+                <a href="{% if session.get('role') == 'lender' %}/lender/dashboard{% else %}/applicant/dashboard{% endif %}" class="sidebar-link">
+                    <i class="fas fa-columns"></i> Portal Overview
+                </a>
+            </li>
+            {% if session.get('role') == 'applicant' %}
+            <li>
+                <a href="/apply" class="sidebar-link">
+                    <i class="fas fa-paper-plane"></i> Apply for Loan
+                </a>
+            </li>
+            {% endif %}
+            <li>
+                <a href="/agreements" class="sidebar-link active">
+                    <i class="fas fa-file-signature"></i> Digital Agreements
+                </a>
+            </li>
+            <li>
+                <a href="/calculator" class="sidebar-link">
+                    <i class="fas fa-calculator"></i> EMI Calculator
+                </a>
+            </li>
+        </ul>
+    </aside>
+    
+    <!-- Main Content Area -->
+    <main class="dashboard-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 15px;">
+            <div>
+                <h1 style="font-size: 1.85rem; font-weight: 700; margin-bottom: 6px; color: var(--text-primary);">Digital Loan Agreements</h1>
+                <p style="color: var(--text-secondary);">
+                    {% if session.get('role') == 'lender' %}
+                        Agreements for My Approved Loans
+                    {% else %}
+                        My Digital Loan Agreements
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+
+        {% if agreements %}
+        <div class="glass-panel" style="padding: 25px; border-radius: 16px;">
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: separate; border-spacing: 0; color: var(--text-primary);">
+                    <thead>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); text-align: left; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);">
+                            <th style="padding: 14px 16px;">Agreement ID</th>
+                            <th style="padding: 14px 16px;">{% if session.get('role') == 'lender' %}Vendor / Borrower{% else %}Lender{% endif %}</th>
+                            <th style="padding: 14px 16px;">Loan Amount</th>
+                            <th style="padding: 14px 16px;">Tenure & EMI</th>
+                            <th style="padding: 14px 16px;">Status</th>
+                            <th style="padding: 14px 16px;">Created Date</th>
+                            <th style="padding: 14px 16px; text-align: right;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for agr in agreements %}
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s ease;">
+                            <td style="padding: 16px; font-weight: 700; color: var(--primary);">
+                                <a href="/agreement/{{ agr.id }}" style="color: inherit; text-decoration: none;">
+                                    <i class="fas fa-file-contract" style="margin-right: 6px;"></i>{{ agr.agreement_code }}
+                                </a>
+                            </td>
+                            <td style="padding: 16px;">
+                                {% if session.get('role') == 'lender' %}
+                                    <strong>{{ agr.vendor_name }}</strong>
+                                {% else %}
+                                    <strong>{{ agr.lender_name }}</strong>
+                                {% endif %}
+                            </td>
+                            <td style="padding: 16px; font-weight: 600;">₹{{ "{:,.2f}".format(agr.loan_amount) }}</td>
+                            <td style="padding: 16px;">
+                                {{ agr.tenure_months }} Mos @ ₹{{ "{:,.2f}".format(agr.emi_amount) }}/mo
+                            </td>
+                            <td style="padding: 16px;">
+                                {% if agr.status == 'Approved' %}
+                                    <span style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;"><i class="fas fa-check-circle" style="margin-right: 4px;"></i>Approved / Active</span>
+                                {% elif agr.status == 'Documents Pending' %}
+                                    <span style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;"><i class="fas fa-clock" style="margin-right: 4px;"></i>Docs Pending</span>
+                                {% elif agr.status == 'Under Review' %}
+                                    <span style="background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;"><i class="fas fa-search" style="margin-right: 4px;"></i>Under Review</span>
+                                {% else %}
+                                    <span style="background: rgba(100, 116, 139, 0.15); color: #94a3b8; border: 1px solid rgba(100, 116, 139, 0.3); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">{{ agr.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td style="padding: 16px; font-size: 0.85rem; color: var(--text-secondary);">
+                                {{ agr.created_at[:10] }}
+                            </td>
+                            <td style="padding: 16px; text-align: right;">
+                                <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                                    <a href="/agreement/{{ agr.id }}" class="btn btn-outline" style="font-size: 0.8rem; padding: 6px 12px;">
+                                        <i class="fas fa-eye"></i> View
+                                    </a>
+                                    <a href="/agreement/{{ agr.id }}/pdf" class="btn btn-primary" style="font-size: 0.8rem; padding: 6px 12px;">
+                                        <i class="fas fa-download"></i> PDF
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% else %}
+        <div class="glass-panel" style="padding: 50px; text-align: center; border-radius: 16px;">
+            <i class="fas fa-file-signature" style="font-size: 3rem; color: var(--text-muted); margin-bottom: 15px;"></i>
+            <h3 style="font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">No Digital Agreements Found</h3>
+            <p style="color: var(--text-secondary); max-width: 500px; margin: 0 auto 20px auto;">
+                Agreements are automatically generated once a lender approves a loan application.
+            </p>
+        </div>
+        {% endif %}
+    </main>
+</div>
+{% endblock %}

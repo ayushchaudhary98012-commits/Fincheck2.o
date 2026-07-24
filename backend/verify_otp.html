@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinTrust | Verify Passcode</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="static/css/styles.css">
+    <script>
+        (function() {
+            const storedTheme = localStorage.getItem('fintrust_theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', storedTheme);
+        })();
+    </script>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="index.html" class="nav-brand">
+            <i class="fas fa-shield-halved"></i>
+            <span>Fin</span> Trust
+        </a>
+    </nav>
+
+    <main class="main-content" style="max-width: 450px; margin: 60px auto; padding: 0 20px;">
+        <div class="glass-panel" style="padding: 40px; border-radius: 20px; text-align: center;">
+            <div style="font-size: 3rem; color: var(--primary); margin-bottom: 20px;">
+                <i class="fas fa-shield-check"></i>
+            </div>
+            
+            <h2 style="font-size: 1.8rem; font-weight: 800; color: var(--text-primary); margin-bottom: 10px;">Security Verification</h2>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 24px; line-height: 1.5;">
+                We sent a 6-digit security code to <br><strong id="display-email" style="color: var(--primary);">your email</strong>.
+            </p>
+            
+            <form id="otp-form">
+                <input type="hidden" id="otp-email" name="email">
+                
+                <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 24px;">
+                    <input type="text" maxlength="6" id="otp-input" class="form-control" placeholder="123456" style="text-align: center; font-size: 1.8rem; letter-spacing: 8px; font-weight: 700; width: 220px;" required>
+                </div>
+                
+                <button type="submit" id="btn-verify" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 600;">
+                    Verify & Continue <i class="fas fa-arrow-right" style="margin-left: 6px;"></i>
+                </button>
+            </form>
+            
+            <div style="margin-top: 24px; font-size: 0.85rem; color: var(--text-muted);">
+                Didn't receive the code? 
+                <button id="btn-resend" style="background: none; border: none; color: var(--primary); font-weight: 600; cursor: pointer; text-decoration: underline;">Resend OTP</button>
+            </div>
+        </div>
+    </main>
+
+    <script src="static/js/config.js"></script>
+    <script src="static/js/app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const email = urlParams.get('email') || '';
+            
+            document.getElementById('otp-email').value = email;
+            if (email) {
+                document.getElementById('display-email').innerText = email;
+            }
+            
+            document.getElementById('otp-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const otp = document.getElementById('otp-input').value.trim();
+                const submitBtn = document.getElementById('btn-verify');
+                
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
+                
+                try {
+                    const response = await apiFetch('/api/auth/verify-otp', {
+                        method: 'POST',
+                        body: JSON.stringify({ email, otp })
+                    });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        showToast('Verification successful!', 'success');
+                        const role = (data.user && data.user.role) || data.role || 'applicant';
+                        let targetPage = 'applicant_dashboard.html';
+                        if (role === 'admin') targetPage = 'admin_dashboard.html';
+                        else if (role === 'lender') targetPage = 'lender_dashboard.html';
+                        setTimeout(() => { window.location.href = targetPage; }, 800);
+                    } else {
+                        showToast(data.error || 'Invalid passcode.', 'error');
+                    }
+                } catch (err) {
+                    showToast('Verification error.', 'error');
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = 'Verify & Continue <i class="fas fa-arrow-right"></i>';
+                }
+            });
+            
+            document.getElementById('btn-resend').addEventListener('click', async () => {
+                try {
+                    const res = await apiFetch('/api/auth/send-otp', {
+                        method: 'POST',
+                        body: JSON.stringify({ email })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        showToast('New OTP dispatched!', 'success');
+                    } else {
+                        showToast(data.error || 'Failed to resend OTP.', 'error');
+                    }
+                } catch (e) {
+                    showToast('Failed to resend OTP.', 'error');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

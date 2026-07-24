@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinTrust | Digital Agreements</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="static/css/styles.css">
+    <script>
+        (function() {
+            const storedTheme = localStorage.getItem('fintrust_theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', storedTheme);
+        })();
+    </script>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="index.html" class="nav-brand">
+            <i class="fas fa-shield-halved"></i>
+            <span>Fin</span> Trust
+        </a>
+        <ul class="nav-menu">
+            <li><a href="index.html" class="nav-link">Home</a></li>
+            <li><a href="calculator.html" class="nav-link">EMI Calculator</a></li>
+            <li><a href="agreements.html" class="nav-link active">Agreements</a></li>
+            <li><a href="verification.html" class="nav-link">Verify Trust</a></li>
+        </ul>
+        <div class="nav-actions">
+            <button id="theme-toggle-btn" class="theme-toggle"><i class="fas fa-moon"></i></button>
+            <div id="nav-auth-section"></div>
+        </div>
+    </nav>
+
+    <main class="main-content" style="max-width: 1100px; margin: 40px auto; padding: 0 20px;">
+        <div style="margin-bottom: 30px;">
+            <h1 style="font-size: 2.2rem; font-weight: 800; color: var(--text-primary);">Digital Loan Agreements</h1>
+            <p style="color: var(--text-secondary);">Manage and sign legally binding digital credit contracts.</p>
+        </div>
+
+        <div class="glass-panel" style="padding: 30px; border-radius: 20px;">
+            <div id="agreements-list-container">
+                <p style="color: var(--text-muted);">Loading digital agreements...</p>
+            </div>
+        </div>
+    </main>
+
+    <script src="static/js/config.js"></script>
+    <script src="static/js/app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const res = await apiFetch('/api/agreements/data');
+                if (!res.ok) {
+                    window.location.href = 'login.html';
+                    return;
+                }
+                const data = await res.json();
+                
+                const container = document.getElementById('agreements-list-container');
+                if (!data.agreements || data.agreements.length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-muted);">No digital loan agreements found.</p>';
+                } else {
+                    let html = `<div style="display: flex; flex-direction: column; gap: 16px;">`;
+                    data.agreements.forEach(ag => {
+                        html += `<div class="glass-panel" style="padding: 20px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <h4 style="font-weight: 700; font-size: 1.1rem; color: var(--text-primary); margin-bottom: 4px;">Agreement #${ag.id} - ${ag.applicant_name}</h4>
+                                <div style="font-size: 0.85rem; color: var(--text-secondary);">Amount: ₹${Number(ag.loan_amount).toLocaleString()} | Lender: ${ag.lender_name}</div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <span class="badge ${ag.status === 'Completed' ? 'badge-approved' : 'badge-pending'}">${ag.status}</span>
+                                <a href="${API_BASE_URL}/agreement/${ag.id}/pdf" target="_blank" class="btn btn-primary" style="padding: 6px 14px; font-size: 0.85rem;">
+                                    <i class="fas fa-file-pdf"></i> Download PDF
+                                </a>
+                            </div>
+                        </div>`;
+                    });
+                    html += `</div>`;
+                    container.innerHTML = html;
+                }
+            } catch (e) {
+                console.error("Agreements error:", e);
+            }
+        });
+    </script>
+</body>
+</html>

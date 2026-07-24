@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}FinTrust | Loan Application Form{% endblock %}
+
+{% block content %}
+<div class="glass-panel apply-container">
+    <div class="form-header">
+        <h2>{{ _('Loan_Application_Wizard') }}</h2>
+        <p>Complete the application steps to assess your eligibility and check your financial health.</p>
+    </div>
+    
+    <!-- Step Indicator Progress Bar -->
+    <div class="step-indicator">
+        <div class="step-line-progress"></div>
+        <div class="step active">
+            <div class="step-number">1</div>
+            <div class="step-label">{{ _('Personal_Details') }}</div>
+        </div>
+        <div class="step">
+            <div class="step-number">2</div>
+            <div class="step-label">{{ _('Employment_Info') }}</div>
+        </div>
+        <div class="step">
+            <div class="step-number">3</div>
+            <div class="step-label">{{ _('Loan_Requirements') }}</div>
+        </div>
+    </div>
+    
+    <!-- Multi-step Form -->
+    <form id="loan-apply-form" action="/apply" method="POST" novalidate>
+        <!-- Step 1: Personal Profile -->
+        <div class="form-step active">
+            <h3 style="margin-bottom: 20px; font-weight: 600;"><i class="fas fa-user-circle" style="color: var(--primary);"></i> {{ _('Personal_Details') }}</h3>
+            
+            <div class="form-group">
+                <label for="full_name">{{ _('Full_Name') }} *</label>
+                <input type="text" id="full_name" name="full_name" class="form-control" placeholder="John Doe" required>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="age">{{ _('Age') }} *</label>
+                    <input type="number" id="age" name="age" class="form-control" placeholder="30" min="18" max="100" required>
+                </div>
+                <div class="form-group">
+                    <label for="gender">{{ _('Gender') }} *</label>
+                    <select id="gender" name="gender" class="form-control" required>
+                        <option value="" disabled selected>Select gender</option>
+                        <option value="Male">{{ _('Male') }}</option>
+                        <option value="Female">{{ _('Female') }}</option>
+                        <option value="Other">{{ _('Other') }}</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="email">{{ _('Email_Address') }} *</label>
+                    <input type="email" id="email" name="email" class="form-control" placeholder="john@example.com" required>
+                </div>
+                <div class="form-group">
+                    <label for="phone">{{ _('Phone_Number') }} *</label>
+                    <input type="tel" id="phone" name="phone" class="form-control" placeholder="9876543210" required>
+                </div>
+            </div>
+            
+            <div class="form-navigation">
+                <div></div>
+                <button type="button" class="btn btn-primary btn-next">{{ _('Next') }} <i class="fas fa-arrow-right"></i></button>
+            </div>
+        </div>
+        
+        <!-- Step 2: Financial Capacity -->
+        <div class="form-step">
+            <h3 style="margin-bottom: 20px; font-weight: 600;"><i class="fas fa-wallet" style="color: var(--primary);"></i> {{ _('Employment_Info') }}</h3>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="employment_type">{{ _('Employment_Type') }} *</label>
+                    <select id="employment_type" name="employment_type" class="form-control" required>
+                        <option value="" disabled selected>Select employment</option>
+                        <option value="Salaried">{{ _('Salaried') }}</option>
+                        <option value="Self-Employed">{{ _('Self_Employed') }}</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="profession">{{ _('Profession') }} *</label>
+                    <input type="text" id="profession" name="profession" class="form-control" placeholder="Software Engineer" required>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="monthly_income">{{ _('Monthly_Income') }} *</label>
+                    <input type="number" id="monthly_income" name="monthly_income" class="form-control" placeholder="5000" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="existing_emi">{{ _('Existing_EMI') }} *</label>
+                    <input type="number" id="existing_emi" name="existing_emi" class="form-control" placeholder="500" min="0" required>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="existing_debts">{{ _('Existing_Debts') }} *</label>
+                <input type="number" id="existing_debts" name="existing_debts" class="form-control" placeholder="12000" min="0" required>
+                <span style="font-size: 0.8rem; color: var(--text-muted);">Please include credit card balances, personal balances, and outstanding student loans.</span>
+            </div>
+            
+            <div class="form-navigation">
+                <button type="button" class="btn btn-secondary btn-prev"><i class="fas fa-arrow-left"></i> {{ _('Previous') }}</button>
+                <button type="button" class="btn btn-primary btn-next">{{ _('Next') }} <i class="fas fa-arrow-right"></i></button>
+            </div>
+        </div>
+        
+        <!-- Step 3: Loan Details -->
+        <div class="form-step">
+            <h3 style="margin-bottom: 20px; font-weight: 600;"><i class="fas fa-hand-holding-dollar" style="color: var(--primary);"></i> {{ _('Loan_Requirements') }}</h3>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="loan_type">{{ _('Loan_Type') }} *</label>
+                    <select id="loan_type" name="loan_type" class="form-control" required>
+                        <option value="" disabled selected>Select loan type</option>
+                        <option value="Home">{{ _('Home_Loan') }}</option>
+                        <option value="Personal">{{ _('Personal') }}</option>
+                        <option value="Education">{{ _('Education') }}</option>
+                        <option value="Business">{{ _('Business_Loan') }}</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="credit_history">{{ _('Credit_History') }} *</label>
+                    <select id="credit_history" name="credit_history" class="form-control" required>
+                        <option value="1">{{ _('Good_Credit') }}</option>
+                        <option value="0">{{ _('Poor_Credit') }}</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="loan_amount">{{ _('Requested_Amount') }} *</label>
+                    <input type="number" id="loan_amount" name="loan_amount" class="form-control" placeholder="100000" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="loan_tenure">{{ _('Tenure_Months') }} *</label>
+                    <div style="position: relative;">
+                        <input type="number" id="loan_tenure" name="loan_tenure" class="form-control" placeholder="Enter months (1 - 120)" min="1" max="120" required style="padding-right: 42px;">
+                        <select id="tenure_overlay_select" title="Choose from preset options" style="position: absolute; right: 0; top: 0; bottom: 0; width: 42px; opacity: 0; cursor: pointer; z-index: 2;" onchange="if(this.value){ document.getElementById('loan_tenure').value = this.value; this.selectedIndex = 0; }">
+                            <option value="" disabled selected></option>
+                            <option value="6">6 Months (0.5 Yr)</option>
+                            <option value="12">12 Months (1 Yr)</option>
+                            <option value="18">18 Months (1.5 Yrs)</option>
+                            <option value="24">24 Months (2 Yrs)</option>
+                            <option value="36">36 Months (3 Yrs)</option>
+                            <option value="48">48 Months (4 Yrs)</option>
+                            <option value="60">60 Months (5 Yrs)</option>
+                            <option value="72">72 Months (6 Yrs)</option>
+                            <option value="84">84 Months (7 Yrs)</option>
+                            <option value="96">96 Months (8 Yrs)</option>
+                            <option value="108">108 Months (9 Yrs)</option>
+                            <option value="120">120 Months (10 Yrs)</option>
+                        </select>
+                        <div style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--text-secondary); z-index: 1; font-size: 0.85rem;">
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                    </div>
+                    <span style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; display: block;">Type any number of months (1 - 120) or click the arrow on the right to pick a preset.</span>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="guarantor_name">{{ _('Guarantor_Name') }} *</label>
+                    <input type="text" id="guarantor_name" name="guarantor_name" class="form-control" placeholder="Jane Doe" required>
+                </div>
+                <div class="form-group">
+                    <label for="guarantor_income">{{ _('Guarantor_Income') }} *</label>
+                    <input type="number" id="guarantor_income" name="guarantor_income" class="form-control" placeholder="3000" min="0" required>
+                </div>
+            </div>
+            
+            <div class="form-navigation">
+                <button type="button" class="btn btn-secondary btn-prev"><i class="fas fa-arrow-left"></i> {{ _('Previous') }}</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-circle-check"></i> {{ _('Submit_Application') }}</button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

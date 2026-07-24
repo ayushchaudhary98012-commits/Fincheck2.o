@@ -153,14 +153,20 @@ from reportlab.lib import colors
 
 from flask_cors import CORS
 
-app = Flask(__name__,
-            template_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'frontend', 'templates'),
-            static_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'frontend', 'static'))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+candidate_dirs = [
+    BASE_DIR,
+    os.path.abspath(os.path.join(BASE_DIR, '..', 'frontend')),
+    os.path.abspath(os.path.join(BASE_DIR, 'frontend'))
+]
+
+FRONTEND_DIR = next((p for p in candidate_dirs if os.path.exists(os.path.join(p, 'templates')) or os.path.exists(os.path.join(p, 'index.html'))), BASE_DIR)
+TEMPLATE_DIR = os.path.join(FRONTEND_DIR, 'templates') if os.path.exists(os.path.join(FRONTEND_DIR, 'templates')) else BASE_DIR
+STATIC_DIR = os.path.join(FRONTEND_DIR, 'static') if os.path.exists(os.path.join(FRONTEND_DIR, 'static')) else BASE_DIR
+
+app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR)
 app.secret_key = 'fintrust_super_secret_session_key_19385'
 CORS(app, supports_credentials=True)
-
-FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'frontend'))
-STATIC_DIR = os.path.abspath(os.path.join(FRONTEND_DIR, 'static'))
 
 
 # Firebase configurations (read from environment or use fallback values for demo convenience)

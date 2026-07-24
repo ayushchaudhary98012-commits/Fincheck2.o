@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinTrust | Authentication</title>
+    <meta name="description" content="Sign in or register for a FinTrust account to access credit scoring and lending tools.">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="static/css/styles.css">
+    <script>
+        (function() {
+            const storedTheme = localStorage.getItem('fintrust_theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', storedTheme);
+        })();
+    </script>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <a href="index.html" class="nav-brand">
+            <i class="fas fa-shield-halved"></i>
+            <span>Fin</span> Trust
+        </a>
+        
+        <ul class="nav-menu">
+            <li><a href="index.html" class="nav-link">Home</a></li>
+            <li><a href="calculator.html" class="nav-link">EMI Calculator</a></li>
+            <li><a href="agreements.html" class="nav-link">Agreements</a></li>
+            <li><a href="verification.html" class="nav-link">Verify Trust</a></li>
+        </ul>
+        
+        <div class="nav-actions">
+            <!-- Language Dropdown Selector -->
+            <select id="language-select" class="theme-toggle" style="height: 38px; padding: 0 10px; border-radius: 8px; background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid rgba(255,255,255,0.1); cursor: pointer;">
+                <option value="en" selected>English</option>
+                <option value="hi">हिन्दी</option>
+                <option value="kn">ಕನ್ನಡ</option>
+                <option value="ta">தமிழ்</option>
+                <option value="te">తెలుగు</option>
+                <option value="mr">मराठी</option>
+            </select>
+
+            <button id="theme-toggle-btn" class="theme-toggle" title="Toggle Light/Dark Theme">
+                <i class="fas fa-moon"></i>
+            </button>
+            
+            <div id="nav-auth-section">
+                <a href="login.html" class="btn btn-outline" style="padding: 8px 16px; font-size: 0.85rem;">Login</a>
+                <a href="login.html?register=true" class="btn btn-primary" style="padding: 8px 16px; font-size: 0.85rem;">Register Now</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Container -->
+    <main class="main-content" style="max-width: 500px; margin: 40px auto; padding: 0 20px;">
+        <div class="glass-panel form-container" style="padding: 35px; border-radius: 20px;">
+            <div style="display: flex; border-bottom: 1px solid var(--glass-border); margin-bottom: 30px;">
+                <button id="tab-login" class="btn" style="flex: 1; border-radius: 0; background: none; border-bottom: 2px solid var(--primary); font-weight: 600; color: var(--primary);">Login</button>
+                <button id="tab-register" class="btn" style="flex: 1; border-radius: 0; background: none; border-bottom: 2px solid transparent; font-weight: 500; color: var(--text-secondary);">Register Now</button>
+            </div>
+            
+            <!-- Login Form -->
+            <form id="form-login" style="display: block;">
+                <div class="form-header" style="margin-bottom: 20px;">
+                    <h2 style="font-size: 1.8rem; font-weight: 800; color: var(--text-primary); margin-bottom: 6px;">Welcome Back</h2>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Enter your account details to access your portal.</p>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label for="login-email" style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem;">Username or Email</label>
+                    <input type="text" id="login-email" name="username" class="form-control" placeholder="admin or user" required style="width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05); color: var(--text-primary);">
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <label for="login-password" style="font-weight: 600; font-size: 0.85rem;">Password</label>
+                        <a href="#" id="link-forgot-password" style="font-size: 0.8rem; color: var(--primary); text-decoration: none;">Forgot Password?</a>
+                    </div>
+                    <input type="password" id="login-password" name="password" class="form-control" placeholder="••••••••" required style="width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05); color: var(--text-primary);">
+                </div>
+                
+                <button type="submit" id="btn-login-submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 600;">
+                    <i class="fas fa-sign-in-alt" style="margin-right: 6px;"></i> Login
+                </button>
+
+                <div style="margin-top: 20px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 10px; font-size: 0.8rem; color: var(--text-muted);">
+                    <strong>Demo Accounts:</strong><br>
+                    • Lender / Admin: <code>admin</code> / <code>admin123</code><br>
+                    • Applicant: <code>user</code> / <code>user123</code>
+                </div>
+            </form>
+            
+            <!-- Forgot Password Form -->
+            <form id="form-forgot" style="display: none;">
+                <div class="form-header" style="margin-bottom: 20px;">
+                    <h2 style="font-size: 1.8rem; font-weight: 800; color: var(--text-primary); margin-bottom: 6px;">Reset Password</h2>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Enter your email to receive a password reset link.</p>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="forgot-email" style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem;">Email Address</label>
+                    <input type="email" id="forgot-email" name="email" class="form-control" placeholder="name@example.com" required style="width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05); color: var(--text-primary);">
+                </div>
+                
+                <button type="submit" id="btn-forgot-submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 600;">
+                    <i class="fas fa-paper-plane" style="margin-right: 6px;"></i> Send Reset Link
+                </button>
+                
+                <div style="text-align: center; margin-top: 15px;">
+                    <a href="#" id="link-back-login" style="font-size: 0.9rem; color: var(--primary); text-decoration: none;"><i class="fas fa-arrow-left"></i> Back to Login</a>
+                </div>
+            </form>
+            
+            <!-- Register Form -->
+            <form id="form-register" style="display: none;">
+                <div class="form-header" style="margin-bottom: 20px;">
+                    <h2 style="font-size: 1.8rem; font-weight: 800; color: var(--text-primary); margin-bottom: 6px;">Register Account</h2>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Create your account to get started.</p>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label for="reg-username" style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem;">Username</label>
+                    <input type="text" id="reg-username" name="username" class="form-control" placeholder="Username" required style="width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05); color: var(--text-primary);">
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label for="reg-email" style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem;">Email Address</label>
+                    <input type="email" id="reg-email" name="email" class="form-control" placeholder="name@example.com" required style="width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05); color: var(--text-primary);">
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label for="reg-phone" style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem;">Phone Number</label>
+                    <input type="tel" id="reg-phone" name="phone" class="form-control" placeholder="+91..." required style="width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05); color: var(--text-primary);">
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label for="reg-role" style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem;">Select Role</label>
+                    <select id="reg-role" name="role" class="form-control" required style="width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05); color: var(--text-primary);">
+                        <option value="applicant">Borrower</option>
+                        <option value="lender">Lender</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label for="reg-password" style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem;">Password</label>
+                    <input type="password" id="reg-password" name="password" class="form-control" placeholder="••••••••" required style="width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05); color: var(--text-primary);">
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="reg-confirm" style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem;">Confirm Password</label>
+                    <input type="password" id="reg-confirm" name="confirm_password" class="form-control" placeholder="••••••••" required style="width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05); color: var(--text-primary);">
+                </div>
+                
+                <button type="submit" id="btn-register-submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 600;">
+                    <i class="fas fa-user-plus" style="margin-right: 6px;"></i> Register Now
+                </button>
+            </form>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div>&copy; 2026 FinTrust Financial Corp. All rights reserved.</div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="static/js/config.js"></script>
+    <script src="static/js/app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const tabLogin = document.getElementById('tab-login');
+            const tabRegister = document.getElementById('tab-register');
+            const formLogin = document.getElementById('form-login');
+            const formRegister = document.getElementById('form-register');
+            const formForgot = document.getElementById('form-forgot');
+            const linkForgotPassword = document.getElementById('link-forgot-password');
+            const linkBackLogin = document.getElementById('link-back-login');
+            
+            function showLogin() {
+                formLogin.style.display = 'block';
+                formRegister.style.display = 'none';
+                formForgot.style.display = 'none';
+                tabLogin.style.borderBottomColor = 'var(--primary)';
+                tabLogin.style.color = 'var(--primary)';
+                tabLogin.style.fontWeight = '600';
+                tabRegister.style.borderBottomColor = 'transparent';
+                tabRegister.style.color = 'var(--text-secondary)';
+                tabRegister.style.fontWeight = '500';
+            }
+            
+            function showRegister() {
+                formLogin.style.display = 'none';
+                formRegister.style.display = 'block';
+                formForgot.style.display = 'none';
+                tabRegister.style.borderBottomColor = 'var(--primary)';
+                tabRegister.style.color = 'var(--primary)';
+                tabRegister.style.fontWeight = '600';
+                tabLogin.style.borderBottomColor = 'transparent';
+                tabLogin.style.color = 'var(--text-secondary)';
+                tabLogin.style.fontWeight = '500';
+            }
+            
+            function showForgot() {
+                formLogin.style.display = 'none';
+                formRegister.style.display = 'none';
+                formForgot.style.display = 'block';
+                tabLogin.style.borderBottomColor = 'transparent';
+                tabLogin.style.color = 'var(--text-secondary)';
+                tabLogin.style.fontWeight = '500';
+                tabRegister.style.borderBottomColor = 'transparent';
+                tabRegister.style.color = 'var(--text-secondary)';
+                tabRegister.style.fontWeight = '500';
+            }
+            
+            tabLogin.addEventListener('click', showLogin);
+            tabRegister.addEventListener('click', showRegister);
+            
+            linkForgotPassword.addEventListener('click', (e) => {
+                e.preventDefault();
+                showForgot();
+            });
+            
+            linkBackLogin.addEventListener('click', (e) => {
+                e.preventDefault();
+                showLogin();
+            });
+            
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('register') === 'true') {
+                showRegister();
+            }
+            
+            // Login Handler via REST API
+            formLogin.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const username = document.getElementById('login-email').value.trim();
+                const password = document.getElementById('login-password').value;
+                const submitBtn = document.getElementById('btn-login-submit');
+                
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Authenticating...';
+                
+                try {
+                    const formData = new FormData();
+                    formData.append('action', 'login');
+                    formData.append('username', username);
+                    formData.append('password', password);
+                    
+                    const response = await apiFetch('/login', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        showToast('Logged in successfully!', 'success');
+                        const role = data.role || (data.user && data.user.role) || 'applicant';
+                        let targetPage = 'applicant_dashboard.html';
+                        if (role === 'admin') targetPage = 'admin_dashboard.html';
+                        else if (role === 'lender') targetPage = 'lender_dashboard.html';
+                        setTimeout(() => { window.location.href = targetPage; }, 500);
+                    } else {
+                        showToast(data.error || 'Invalid username or password.', 'error');
+                    }
+                } catch (err) {
+                    console.error(err);
+                    showToast('Connection to backend server failed.', 'error');
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
+                }
+            });
+            
+            // Register Handler via REST API
+            formRegister.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const username = document.getElementById('reg-username').value.trim();
+                const email = document.getElementById('reg-email').value.trim();
+                const phone = document.getElementById('reg-phone').value.trim();
+                const role = document.getElementById('reg-role').value;
+                const password = document.getElementById('reg-password').value;
+                const confirm = document.getElementById('reg-confirm').value;
+                
+                if (password !== confirm) {
+                    showToast('Passwords do not match.', 'error');
+                    return;
+                }
+                
+                const submitBtn = document.getElementById('btn-register-submit');
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating Account...';
+                
+                try {
+                    const formData = new FormData();
+                    formData.append('action', 'register');
+                    formData.append('username', username);
+                    formData.append('email', email);
+                    formData.append('phone', phone);
+                    formData.append('role', role);
+                    formData.append('password', password);
+                    formData.append('confirm_password', confirm);
+                    
+                    const response = await apiFetch('/login', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if (response.redirected && response.url.includes('verify-otp')) {
+                        showToast('Registration code sent!', 'info');
+                        window.location.href = `verify_otp.html?email=${encodeURIComponent(email)}`;
+                    } else {
+                        showToast('Account creation initiated. Check OTP verification.', 'info');
+                        window.location.href = `verify_otp.html?email=${encodeURIComponent(email)}`;
+                    }
+                } catch (err) {
+                    console.error(err);
+                    showToast('Registration request failed.', 'error');
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> Register Now';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

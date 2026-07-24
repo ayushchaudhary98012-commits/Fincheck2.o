@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+
+{% block title %}FinTrust | Agreement Details #{{ agr.agreement_code }}{% endblock %}
+
+{% block content %}
+<style>
+@media print {
+    .sidebar, .navbar, .no-print, .btn, form { display: none !important; }
+    .dashboard-container { display: block !important; padding: 0 !important; }
+    .glass-panel { border: 1px solid #ccc !important; box-shadow: none !important; color: #000 !important; background: #fff !important; }
+    body { background: #fff !important; color: #000 !important; }
+}
+</style>
+
+<div class="dashboard-container">
+    <!-- Sidebar -->
+    <aside class="sidebar no-print">
+        <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; padding: 0 16px; margin-bottom: 15px;">Menu</div>
+        <ul class="sidebar-menu">
+            <li>
+                <a href="{% if session.get('role') == 'lender' %}/lender/dashboard{% else %}/applicant/dashboard{% endif %}" class="sidebar-link">
+                    <i class="fas fa-columns"></i> Portal Overview
+                </a>
+            </li>
+            <li>
+                <a href="/agreements" class="sidebar-link active">
+                    <i class="fas fa-file-signature"></i> Digital Agreements
+                </a>
+            </li>
+            <li>
+                <a href="/calculator" class="sidebar-link">
+                    <i class="fas fa-calculator"></i> EMI Calculator
+                </a>
+            </li>
+        </ul>
+    </aside>
+    
+    <!-- Main Content Area -->
+    <main class="dashboard-content">
+        <!-- Top Action Bar -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px;" class="no-print">
+            <a href="/agreements" style="color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; font-weight: 600;">
+                <i class="fas fa-arrow-left" style="margin-right: 6px;"></i> Back to Agreements
+            </a>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="window.print()" class="btn btn-outline" style="font-size: 0.85rem;">
+                    <i class="fas fa-print" style="margin-right: 6px;"></i> Print Agreement
+                </button>
+                <a href="/agreement/{{ agr.id }}/pdf" class="btn btn-primary" style="font-size: 0.85rem;">
+                    <i class="fas fa-file-pdf" style="margin-right: 6px;"></i> Download PDF
+                </a>
+            </div>
+        </div>
+
+        <!-- Agreement Header -->
+        <div class="glass-panel" style="padding: 25px; border-radius: 16px; margin-bottom: 25px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 15px;">
+                <div>
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
+                        <h1 style="font-size: 1.75rem; font-weight: 800; color: var(--text-primary); margin: 0;">{{ agr.agreement_code }}</h1>
+                        {% if agr.status == 'Approved' %}
+                            <span style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); padding: 4px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 700;"><i class="fas fa-check-circle" style="margin-right: 4px;"></i>Approved & Active</span>
+                        {% elif agr.status == 'Documents Pending' %}
+                            <span style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); padding: 4px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 700;"><i class="fas fa-clock" style="margin-right: 4px;"></i>Docs Pending</span>
+                        {% elif agr.status == 'Under Review' %}
+                            <span style="background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3); padding: 4px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 700;"><i class="fas fa-search" style="margin-right: 4px;"></i>Under Review</span>
+                        {% else %}
+                            <span style="background: rgba(100, 116, 139, 0.15); color: #94a3b8; border: 1px solid rgba(100, 116, 139, 0.3); padding: 4px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 700;">{{ agr.status }}</span>
+                        {% endif %}
+                    </div>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;">Created on {{ agr.created_at }} &bull; Linked Application #AP-{{ agr.application_id }}</p>
+                </div>
+            </div>
+
+            <!-- Financial Terms Overview -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; margin-top: 25px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.08);">
+                <div>
+                    <span style="font-size: 0.8rem; color: var(--text-muted); display: block; text-transform: uppercase;">Loan Amount</span>
+                    <strong style="font-size: 1.3rem; color: var(--primary);">₹{{ "{:,.2f}".format(agr.loan_amount) }}</strong>
+                </div>
+                <div>
+                    <span style="font-size: 0.8rem; color: var(--text-muted); display: block; text-transform: uppercase;">Interest Rate</span>
+                    <strong style="font-size: 1.3rem; color: var(--text-primary);">{{ agr.interest_rate }}% p.a.</strong>
+                </div>
+                <div>
+                    <span style="font-size: 0.8rem; color: var(--text-muted); display: block; text-transform: uppercase;">Tenure</span>
+                    <strong style="font-size: 1.3rem; color: var(--text-primary);">{{ agr.tenure_months }} Months</strong>
+                </div>
+                <div>
+                    <span style="font-size: 0.8rem; color: var(--text-muted); display: block; text-transform: uppercase;">Monthly EMI</span>
+                    <strong style="font-size: 1.3rem; color: #10b981;">₹{{ "{:,.2f}".format(agr.emi_amount) }}</strong>
+                </div>
+                <div>
+                    <span style="font-size: 0.8rem; color: var(--text-muted); display: block; text-transform: uppercase;">Processing Fee</span>
+                    <strong style="font-size: 1.3rem; color: var(--text-primary);">₹{{ "{:,.2f}".format(agr.processing_fee) }}</strong>
+                </div>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 25px; margin-bottom: 25px;">
+            <!-- Parties & Terms Details -->
+            <div style="display: flex; flex-direction: column; gap: 25px;">
+                <!-- Parties Info Card -->
+                <div class="glass-panel" style="padding: 25px; border-radius: 16px;">
+                    <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 18px;">
+                        <i class="fas fa-users" style="margin-right: 8px; color: var(--primary);"></i>Parties to the Agreement
+                    </h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div style="background: rgba(255,255,255,0.03); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                            <span style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 6px;">Lender</span>
+                            <h4 style="font-size: 1rem; margin: 0 0 6px 0; color: var(--text-primary);">{{ agr.lender_name }}</h4>
+                            <div style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5;">
+                                <div><i class="fas fa-envelope" style="width: 16px; text-align: center; margin-right: 6px;"></i>{{ agr.lender_email }}</div>
+                                <div><i class="fas fa-phone" style="width: 16px; text-align: center; margin-right: 6px;"></i>{{ agr.lender_phone or 'Verified Lender' }}</div>
+                            </div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.03); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                            <span style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 6px;">Vendor / Borrower</span>
+                            <h4 style="font-size: 1rem; margin: 0 0 6px 0; color: var(--text-primary);">{{ agr.vendor_full_name }}</h4>
+                            <div style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5;">
+                                <div><i class="fas fa-envelope" style="width: 16px; text-align: center; margin-right: 6px;"></i>{{ agr.vendor_email }}</div>
+                                <div><i class="fas fa-phone" style="width: 16px; text-align: center; margin-right: 6px;"></i>{{ agr.vendor_phone }}</div>
+                                <div><i class="fas fa-briefcase" style="width: 16px; text-align: center; margin-right: 6px;"></i>{{ agr.vendor_profession }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Digital Consent Section -->
+                <div class="glass-panel" style="padding: 25px; border-radius: 16px;">
+                    <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 15px;">
+                        <i class="fas fa-shield-alt" style="margin-right: 8px; color: var(--primary);"></i>Digital Consent & Approval
+                    </h3>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 20px;">
+                        This agreement is digitally generated and mutually accepted by both the lender and the vendor through the platform.
+                    </p>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                        <!-- Vendor Consent Status -->
+                        <div style="padding: 15px; border-radius: 12px; background: {% if agr.vendor_consent %}rgba(16, 185, 129, 0.1){% else %}rgba(255,255,255,0.03){% endif %}; border: 1px solid {% if agr.vendor_consent %}rgba(16, 185, 129, 0.3){% else %}rgba(255,255,255,0.08){% endif %};">
+                            <div style="font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;">Vendor Consent</div>
+                            {% if agr.vendor_consent %}
+                                <div style="color: #10b981; font-weight: 700; font-size: 0.9rem;"><i class="fas fa-check-circle"></i> Digital Accepted</div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">{{ agr.vendor_consent_at }} (IP: {{ agr.vendor_ip }})</div>
+                            {% else %}
+                                <div style="color: #f59e0b; font-weight: 700; font-size: 0.9rem;"><i class="fas fa-hourglass-half"></i> Pending Vendor Sign</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Lender Consent Status -->
+                        <div style="padding: 15px; border-radius: 12px; background: {% if agr.lender_consent %}rgba(16, 185, 129, 0.1){% else %}rgba(255,255,255,0.03){% endif %}; border: 1px solid {% if agr.lender_consent %}rgba(16, 185, 129, 0.3){% else %}rgba(255,255,255,0.08){% endif %};">
+                            <div style="font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;">Lender Consent</div>
+                            {% if agr.lender_consent %}
+                                <div style="color: #10b981; font-weight: 700; font-size: 0.9rem;"><i class="fas fa-check-circle"></i> Digital Accepted</div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">{{ agr.lender_consent_at }} (IP: {{ agr.lender_ip }})</div>
+                            {% else %}
+                                <div style="color: #f59e0b; font-weight: 700; font-size: 0.9rem;"><i class="fas fa-hourglass-half"></i> Pending Lender Sign</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if (is_vendor and not agr.vendor_consent) or (is_lender and not agr.lender_consent) %}
+                    <form action="/api/agreement/{{ agr.id }}/accept" method="POST" class="no-print">
+                        <div style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.3); padding: 15px; border-radius: 12px; margin-bottom: 15px;">
+                            <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; color: var(--text-primary); font-size: 0.9rem;">
+                                <input type="checkbox" required style="margin-top: 3px; accent-color: var(--primary);">
+                                <span>
+                                    {% if is_vendor %}
+                                        <strong>☑️ I agree to the loan terms.</strong> By checking this box, I promise to repay ₹{{ "{:,.2f}".format(agr.loan_amount) }} at {{ agr.interest_rate }}% interest over {{ agr.tenure_months }} months.
+                                    {% else %}
+                                        <strong>☑️ I approve this agreement.</strong> By checking this box, I confirm funding authorization for this agreement.
+                                    {% endif %}
+                                </span>
+                            </label>
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="width: 100%;">
+                            <i class="fas fa-pen-nib" style="margin-right: 6px;"></i> Submit Digital Consent
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+
+                <!-- Document Upload Module -->
+                <div class="glass-panel" style="padding: 25px; border-radius: 16px;">
+                    <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 18px;">
+                        <i class="fas fa-folder-open" style="margin-right: 8px; color: var(--primary);"></i>Uploaded Documents
+                    </h3>
+
+                    <!-- Upload Form -->
+                    <form action="/api/agreement/{{ agr.id }}/upload_document" method="POST" enctype="multipart/form-data" style="margin-bottom: 25px;" class="no-print">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: flex-end;">
+                            <div>
+                                <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Document Category</label>
+                                <select name="document_type" class="form-control" style="width: 100%; font-size: 0.85rem; padding: 10px;" required>
+                                    {% if is_vendor %}
+                                        <option value="Aadhaar Card">Aadhaar Card</option>
+                                        <option value="PAN Card">PAN Card</option>
+                                        <option value="Bank Statement">Bank Statement</option>
+                                        <option value="Business Registration">Business Registration</option>
+                                        <option value="GST Certificate">GST Certificate</option>
+                                        <option value="Income Proof">Income Proof</option>
+                                        <option value="Address Proof">Address Proof</option>
+                                        <option value="Supporting Document">Supporting Document</option>
+                                    {% else %}
+                                        <option value="Sanction Letter">Sanction Letter</option>
+                                        <option value="Approval Letter">Approval Letter</option>
+                                        <option value="Payment Confirmation">Payment Confirmation</option>
+                                        <option value="Loan Terms Document">Loan Terms Document</option>
+                                        <option value="Supporting Document">Supporting Document</option>
+                                    {% endif %}
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Select File (PDF, JPG, PNG)</label>
+                                <input type="file" name="document_file" accept=".pdf,.jpg,.jpeg,.png" required class="form-control" style="font-size: 0.85rem; padding: 7px;">
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="font-size: 0.85rem; padding: 10px 16px;">
+                                <i class="fas fa-upload" style="margin-right: 4px;"></i> Upload
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Document List Table -->
+                    {% if documents %}
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.85rem;">
+                            <thead>
+                                <tr style="text-align: left; color: var(--text-muted); border-bottom: 1px solid rgba(255,255,255,0.08);">
+                                    <th style="padding: 10px;">Doc Type</th>
+                                    <th style="padding: 10px;">File Name</th>
+                                    <th style="padding: 10px;">Uploaded By</th>
+                                    <th style="padding: 10px;">Size</th>
+                                    <th style="padding: 10px;">Status</th>
+                                    <th style="padding: 10px; text-align: right;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for doc in documents %}
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+                                    <td style="padding: 12px 10px; font-weight: 600; color: var(--text-primary);">{{ doc.document_type }}</td>
+                                    <td style="padding: 12px 10px; color: var(--text-secondary);">{{ doc.document_name }}</td>
+                                    <td style="padding: 12px 10px; color: var(--text-muted);">{{ doc.uploader_name }} ({{ doc.uploader_role }})</td>
+                                    <td style="padding: 12px 10px; color: var(--text-muted);">{{ (doc.file_size / 1024)|round(1) }} KB</td>
+                                    <td style="padding: 12px 10px;">
+                                        {% if doc.status == 'Approved' %}
+                                            <span style="color: #10b981; font-weight: 600;"><i class="fas fa-check-circle"></i> Approved</span>
+                                        {% elif doc.status == 'Rejected' %}
+                                            <span style="color: #ef4444; font-weight: 600;"><i class="fas fa-times-circle"></i> Rejected</span>
+                                        {% else %}
+                                            <span style="color: #f59e0b; font-weight: 600;"><i class="fas fa-hourglass"></i> Pending</span>
+                                        {% endif %}
+                                    </td>
+                                    <td style="padding: 12px 10px; text-align: right;">
+                                        <div style="display: flex; gap: 6px; justify-content: flex-end;">
+                                            <a href="/agreement/document/{{ doc.id }}/download" class="btn btn-outline" style="font-size: 0.75rem; padding: 4px 8px;">
+                                                <i class="fas fa-download"></i> Download
+                                            </a>
+                                            {% if (is_lender or session.get('role') == 'admin') and doc.status == 'Pending' %}
+                                            <form action="/api/agreement/document/{{ doc.id }}/status" method="POST" style="display: inline;" class="no-print">
+                                                <input type="hidden" name="status" value="Approved">
+                                                <button type="submit" class="btn btn-success" style="font-size: 0.75rem; padding: 4px 8px; background: #10b981; color: #fff; border: none; border-radius: 6px;">
+                                                    Approve
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0; text-align: center; padding: 15px;">
+                        No documents uploaded yet. Upload required verification documents above.
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Agreement Activity Timeline Side Panel -->
+            <div class="glass-panel" style="padding: 25px; border-radius: 16px; height: fit-content;">
+                <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 20px;">
+                    <i class="fas fa-stream" style="margin-right: 8px; color: var(--primary);"></i>Activity Timeline
+                </h3>
+                <div style="display: flex; flex-direction: column; gap: 20px; position: relative;">
+                    <div style="position: absolute; left: 14px; top: 10px; bottom: 10px; width: 2px; background: rgba(255,255,255,0.08); z-index: 1;"></div>
+                    {% for item in timeline %}
+                    <div style="display: flex; gap: 15px; position: relative; z-index: 2;">
+                        <div style="width: 30px; height: 30px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 0.75rem; flex-shrink: 0;">
+                            {% if item.action_type == 'loan_submitted' %}
+                                <i class="fas fa-paper-plane"></i>
+                            {% elif item.action_type == 'trust_score' %}
+                                <i class="fas fa-robot"></i>
+                            {% elif item.action_type == 'loan_approved' %}
+                                <i class="fas fa-thumbs-up"></i>
+                            {% elif item.action_type == 'agreement_generated' %}
+                                <i class="fas fa-file-contract"></i>
+                            {% elif item.action_type == 'document_uploaded' %}
+                                <i class="fas fa-file-upload"></i>
+                            {% elif item.action_type == 'consent_accepted' %}
+                                <i class="fas fa-pen-nib"></i>
+                            {% else %}
+                                <i class="fas fa-check"></i>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <div style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">{{ item.description }}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
+                                By <strong>{{ item.actor_name }}</strong> ({{ item.actor_role }}) &bull; {{ item.created_at }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}

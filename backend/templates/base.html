@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}FinTrust | AI-Powered Loan Eligibility & Financial Analysis{% endblock %}</title>
+    <!-- Meta tags for SEO -->
+    <meta name="description" content="Check your loan eligibility status, calculate monthly EMI, and get personalized financial health feedback using FinTrust's AI engine.">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Main CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <!-- Inline script to prevent theme flashing -->
+    <script>
+        (function() {
+            const storedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', storedTheme);
+        })();
+    </script>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <a href="/" class="nav-brand">
+            <i class="fas fa-shield-halved"></i>
+            <span>Fin</span> Trust
+        </a>
+        
+        <ul class="nav-menu">
+            <li><a href="/" class="nav-link">{{ _('Home') }}</a></li>
+            <li><a href="/calculator" class="nav-link">{{ _('EMI_Calculator') }}</a></li>
+            {% if session.get('user_id') %}
+                {% if session.get('role') == 'admin' %}
+                    <li><a href="/admin/dashboard" class="nav-link"><i class="fas fa-chart-pie"></i> {{ _('Admin_Dashboard') }}</a></li>
+                {% elif session.get('role') == 'lender' %}
+                    <li><a href="/lender/dashboard" class="nav-link"><i class="fas fa-wallet"></i> {{ _('Lender_Portal') }}</a></li>
+                    <li><a href="/lender/verification" class="nav-link"><i class="fas fa-check-double"></i> {{ _('Verify_Trust') }}</a></li>
+                {% else %}
+                    <li><a href="/applicant/dashboard" class="nav-link"><i class="fas fa-columns"></i> {{ _('Borrower_Dashboard') }}</a></li>
+                    <li><a href="/applicant/verification" class="nav-link"><i class="fas fa-check-double"></i> {{ _('Verify_Trust') }}</a></li>
+                {% endif %}
+            {% endif %}
+        </ul>
+        
+        <div class="nav-actions">
+            <!-- Language Dropdown Selector -->
+            <div class="lang-dropdown-wrap" style="position: relative; display: inline-block;">
+                <button id="lang-btn" class="theme-toggle" title="Select Language" style="display: flex; align-items: center; gap: 6px; padding: 8px 12px; font-size: 0.85rem; border-radius: 8px; background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid rgba(255,255,255,0.1); cursor: pointer; height: 38px;">
+                    <i class="fas fa-globe"></i>
+                    <span>
+                        {% if current_lang == 'en' %}English
+                        {% elif current_lang == 'hi' %}हिन्दी
+                        {% elif current_lang == 'kn' %}ಕನ್ನಡ
+                        {% elif current_lang == 'ta' %}தமிழ்
+                        {% elif current_lang == 'te' %}తెలుగు
+                        {% elif current_lang == 'mr' %}मराठी
+                        {% else %}English{% endif %}
+                    </span>
+                    <i class="fas fa-chevron-down" style="font-size: 0.7rem; margin-left: 2px;"></i>
+                </button>
+                <div id="lang-menu" class="glass-panel" style="display: none; position: absolute; right: 0; top: 110%; width: 130px; z-index: 1000; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); padding: 6px 0; background: var(--bg-card); border: 1px solid rgba(255,255,255,0.1);">
+                    <a href="/set_language/en" style="display: block; padding: 8px 16px; color: var(--text-primary); text-decoration: none; font-size: 0.85rem; transition: background 0.2s;">English</a>
+                    <a href="/set_language/hi" style="display: block; padding: 8px 16px; color: var(--text-primary); text-decoration: none; font-size: 0.85rem; transition: background 0.2s;">हिन्दी</a>
+                    <a href="/set_language/kn" style="display: block; padding: 8px 16px; color: var(--text-primary); text-decoration: none; font-size: 0.85rem; transition: background 0.2s;">ಕನ್ನಡ</a>
+                    <a href="/set_language/ta" style="display: block; padding: 8px 16px; color: var(--text-primary); text-decoration: none; font-size: 0.85rem; transition: background 0.2s;">தமிழ்</a>
+                    <a href="/set_language/te" style="display: block; padding: 8px 16px; color: var(--text-primary); text-decoration: none; font-size: 0.85rem; transition: background 0.2s;">తెలుగు</a>
+                    <a href="/set_language/mr" style="display: block; padding: 8px 16px; color: var(--text-primary); text-decoration: none; font-size: 0.85rem; transition: background 0.2s;">मराठी</a>
+                </div>
+            </div>
+
+            <!-- Theme Toggle Button -->
+            <button id="theme-toggle" class="theme-toggle" title="Toggle Light/Dark Theme">
+                <i class="fas fa-moon"></i>
+            </button>
+            
+            <!-- Notification Dropdown -->
+            {% if session.get('user_id') %}
+            <div class="notification-dropdown-wrap">
+                <button id="notification-bell" class="notification-btn" title="Notifications">
+                    <i class="fas fa-bell"></i>
+                    {% if unread_notifications_count > 0 %}
+                    <span class="notification-badge">{{ unread_notifications_count }}</span>
+                    {% endif %}
+                </button>
+                <div class="notification-menu glass-panel" id="notification-menu">
+                    <div class="notification-header">
+                        <h4>Notifications</h4>
+                        <span class="mark-all-read" id="clear-notifications">Clear</span>
+                    </div>
+                    <ul class="notification-list">
+                        {% if real_notifications %}
+                            {% for notif in real_notifications %}
+                                <li class="notification-item {% if notif.is_read == 0 %}unread{% endif %}" data-id="{{ notif.id }}">
+                                    {% if notif.type == 'success' %}
+                                        <i class="fas fa-check-circle text-success"></i>
+                                    {% elif notif.type == 'danger' %}
+                                        <i class="fas fa-times-circle text-danger"></i>
+                                    {% elif notif.type == 'warning' %}
+                                        <i class="fas fa-exclamation-triangle text-warning"></i>
+                                    {% else %}
+                                        <i class="fas fa-info-circle text-info"></i>
+                                    {% endif %}
+                                    <div>
+                                        <p>{{ notif.message }}</p>
+                                        <small>{{ notif.created_at[:16] }}</small>
+                                    </div>
+                                </li>
+                            {% endfor %}
+                        {% else %}
+                            <li style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem;">No new notifications</li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if session.get('user_id') %}
+                <span class="user-greeting" style="font-size: 0.9rem; font-weight: 500; color: var(--text-secondary);">
+                    {{ _('Hi') }}, <strong>{{ session.get('username') }}</strong>
+                </span>
+                <a href="/logout" class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.85rem;">
+                    <i class="fas fa-sign-out-alt"></i> {{ _('Logout') }}
+                </a>
+            {% else %}
+                <a href="/login" class="btn btn-outline" style="padding: 8px 16px; font-size: 0.85rem;">{{ _('Login') }}</a>
+                <a href="/login?register=true" class="btn btn-primary" style="padding: 8px 16px; font-size: 0.85rem;">{{ _('Register_Now') }}</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <!-- Main Content Block -->
+    {% block content %}
+    {% endblock %}
+
+    <!-- Footer -->
+    <footer>
+        <div>&copy; 2026 FinTrust Financial Corp. All rights reserved.</div>
+        <div style="display: flex; gap: 20px;">
+            <a href="#" style="color: var(--text-muted); text-decoration: none;">{{ _('Privacy_Policy') }}</a>
+            <a href="#" style="color: var(--text-muted); text-decoration: none;">{{ _('Terms_of_Service') }}</a>
+        </div>
+    </footer>
+
+    <!-- AI Chatbot Floating Panel -->
+    <div class="chatbot-container" id="chatbot-container">
+        <button class="chatbot-trigger" id="chatbot-trigger" title="Ask FinTrust AI">
+            <i class="fas fa-robot"></i>
+        </button>
+        <div class="chatbot-panel glass-panel" id="chatbot-panel">
+            <div class="chatbot-header">
+                <div class="chatbot-logo">
+                    <i class="fas fa-brain"></i>
+                    <span>FinTrust AI Expert</span>
+                </div>
+                <button class="chatbot-close" id="chatbot-close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="chatbot-messages" id="chatbot-messages">
+                <div class="chatbot-msg bot">
+                    Hello! I am your FinTrust AI underwriting advisor. Ask me anything about your trust score, compatibility matching, missing documents, or suggested financing.
+                </div>
+            </div>
+            <div class="chatbot-quick-questions">
+                <button class="chat-qq-btn" data-q="Why is my trust score low?">Trust Score?</button>
+                <button class="chat-qq-btn" data-q="How can I improve it?">Improve?</button>
+                <button class="chat-qq-btn" data-q="Suggest better loan amount.">Better Amount?</button>
+                <button class="chat-qq-btn" data-q="What documents are missing?">Missing Docs?</button>
+            </div>
+            <div class="chatbot-input-area">
+                <input type="text" id="chatbot-input" placeholder="Ask AI..." autocomplete="off">
+                <button id="chatbot-send-btn"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div id="toast-container"></div>
+
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Firebase SDK Compat -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+
+    <!-- Core JS -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
+
+    <!-- Chatbot and Notification scripts -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Chatbot toggling
+            const chatbotTrigger = document.getElementById('chatbot-trigger');
+            const chatbotPanel = document.getElementById('chatbot-panel');
+            const chatbotClose = document.getElementById('chatbot-close');
+            const chatbotInput = document.getElementById('chatbot-input');
+            const chatbotSendBtn = document.getElementById('chatbot-send-btn');
+            const chatbotMessages = document.getElementById('chatbot-messages');
+            
+            if (chatbotTrigger && chatbotPanel) {
+                chatbotTrigger.addEventListener('click', () => {
+                    chatbotPanel.classList.toggle('active');
+                });
+            }
+            
+            if (chatbotClose && chatbotPanel) {
+                chatbotClose.addEventListener('click', () => {
+                    chatbotPanel.classList.remove('active');
+                });
+            }
+            
+            // Quick Questions
+            document.querySelectorAll('.chat-qq-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const question = btn.getAttribute('data-q');
+                    sendChatbotMessage(question);
+                });
+            });
+            
+            if (chatbotSendBtn) {
+                chatbotSendBtn.addEventListener('click', () => {
+                    const msg = chatbotInput.value.trim();
+                    if (msg) {
+                        sendChatbotMessage(msg);
+                        chatbotInput.value = '';
+                    }
+                });
+            }
+            
+            if (chatbotInput) {
+                chatbotInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        const msg = chatbotInput.value.trim();
+                        if (msg) {
+                            sendChatbotMessage(msg);
+                            chatbotInput.value = '';
+                        }
+                    }
+                });
+            }
+            
+            function sendChatbotMessage(text) {
+                // Append user message
+                const userMsg = document.createElement('div');
+                userMsg.className = 'chatbot-msg user';
+                userMsg.textContent = text;
+                chatbotMessages.appendChild(userMsg);
+                chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+                
+                // Append loading status
+                const botMsg = document.createElement('div');
+                botMsg.className = 'chatbot-msg bot loading';
+                botMsg.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> AI is thinking...';
+                chatbotMessages.appendChild(botMsg);
+                chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+                
+                // Fetch API response
+                fetch('/api/chatbot', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    botMsg.classList.remove('loading');
+                    botMsg.innerHTML = data.response;
+                    chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+                })
+                .catch(err => {
+                    botMsg.classList.remove('loading');
+                    botMsg.textContent = "Sorry, I am having trouble connecting right now. Please try again shortly.";
+                });
+            }
+
+            // Language dropdown toggle
+            const langBtn = document.getElementById('lang-btn');
+            const langMenu = document.getElementById('lang-menu');
+            if (langBtn && langMenu) {
+                langBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    langMenu.style.display = langMenu.style.display === 'block' ? 'none' : 'block';
+                });
+                document.addEventListener('click', () => {
+                    langMenu.style.display = 'none';
+                });
+            }
+
+            // Notification dropdown toggle
+            const bell = document.getElementById('notification-bell');
+            const menu = document.getElementById('notification-menu');
+            if (bell && menu) {
+                bell.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    menu.classList.toggle('active');
+                });
+                document.addEventListener('click', () => {
+                    menu.classList.remove('active');
+                });
+            }
+            const clearNotif = document.getElementById('clear-notifications');
+            if (clearNotif) {
+                clearNotif.addEventListener('click', () => {
+                    fetch('/api/notifications/clear', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            document.querySelectorAll('.notification-item').forEach(item => item.remove());
+                            const badge = document.querySelector('.notification-badge');
+                            if (badge) badge.remove();
+                            const list = document.querySelector('.notification-list');
+                            if (list) list.innerHTML = '<li style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.85rem;">No new notifications</li>';
+                        }
+                    });
+                });
+            }
+        });
+    </script>
+
+    <!-- Display Flask Flash Messages as Toasts -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <script>
+                document.addEventListener('DOMContentLoaded', () => {
+                    {% for category, message in messages %}
+                        showToast("{{ message }}", "{{ 'success' if category == 'success' else 'error' if category == 'error' else 'info' }}");
+                    {% endfor %}
+                });
+            </script>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Mock Razorpay Payment Modal -->
+    <style>
+        .payment-modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(8px);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 9999;
+            opacity: 0; visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        .payment-modal-overlay.active {
+            opacity: 1; visibility: visible;
+        }
+        .payment-modal-container {
+            width: 420px;
+            background: #1e293b;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            transform: scale(0.9);
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .payment-modal-overlay.active .payment-modal-container {
+            transform: scale(1);
+        }
+        .payment-header {
+            background: #0f172a;
+            padding: 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .payment-logo {
+            display: flex; align-items: center; gap: 8px;
+            font-weight: 700; color: #fff; font-size: 1.1rem;
+        }
+        .payment-logo i { color: #3b82f6; }
+        .payment-amount-badge {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.2);
+            padding: 4px 10px; border-radius: 99px; font-weight: 700; font-size: 0.9rem;
+        }
+        .payment-body {
+            padding: 24px;
+        }
+        .payment-tabs {
+            display: grid; grid-template-columns: repeat(4, 1fr);
+            gap: 8px; margin-bottom: 20px;
+        }
+        .payment-tab-btn {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 8px; padding: 10px 5px; color: var(--text-secondary);
+            font-size: 0.75rem; text-align: center; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .payment-tab-btn.active, .payment-tab-btn:hover {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: #3b82f6; color: #fff;
+        }
+        .payment-tab-btn i { font-size: 1.1rem; margin-bottom: 4px; display: block; }
+        .payment-input-group {
+            margin-bottom: 16px;
+        }
+        .payment-input-group label {
+            display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 6px;
+        }
+        .payment-input {
+            width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
+            color: #fff; font-size: 0.9rem; outline: none;
+        }
+        .payment-input:focus { border-color: #3b82f6; }
+        .payment-row { display: flex; gap: 12px; }
+        .payment-action-btn {
+            width: 100%; padding: 12px; background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+            color: #fff; font-weight: 600; border: none; border-radius: 8px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: transform 0.2s;
+        }
+        .payment-action-btn:hover {
+            transform: translateY(-1px);
+        }
+    </style>
+
+    <div id="payment-gateway-modal" class="payment-modal-overlay">
+        <div class="payment-modal-container">
+            <div class="payment-header">
+                <div class="payment-logo">
+                    <i class="fas fa-shield-halved"></i> FinTrust Secure Pay
+                </div>
+                <div class="payment-amount-badge" id="payment-modal-amount">₹0.00</div>
+            </div>
+            <div class="payment-body">
+                <div class="payment-tabs">
+                    <div class="payment-tab-btn active"><i class="fas fa-credit-card"></i>Card</div>
+                    <div class="payment-tab-btn"><i class="fas fa-mobile-screen-button"></i>UPI</div>
+                    <div class="payment-tab-btn"><i class="fas fa-building-columns"></i>Net</div>
+                    <div class="payment-tab-btn"><i class="fas fa-wallet"></i>Wallet</div>
+                </div>
+                <div class="payment-input-group">
+                    <label>Card Number</label>
+                    <input type="text" class="payment-input" value="4111 2222 3333 4444" placeholder="Card Number" readonly>
+                </div>
+                <div class="payment-row">
+                    <div class="payment-input-group" style="flex: 1;">
+                        <label>Expiry Date</label>
+                        <input type="text" class="payment-input" value="12/29" placeholder="MM/YY" readonly>
+                    </div>
+                    <div class="payment-input-group" style="flex: 1;">
+                        <label>CVV</label>
+                        <input type="password" class="payment-input" value="***" placeholder="CVV" readonly>
+                    </div>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 20px;">
+                    <i class="fas fa-lock" style="color: #10b981;"></i> Simulated Razorpay Secure Sandbox
+                </div>
+                <button class="payment-action-btn" id="payment-modal-submit-btn">
+                    <span>Pay Now</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPaymentOrder = null;
+        let onPaymentSuccess = null;
+
+        window.openMockPaymentModal = function(amount, applicationId, successCallback) {
+            onPaymentSuccess = successCallback;
+
+            // 1. Call Backend Order Creation API
+            fetch('/api/payments/create-order', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amount: amount, application_id: applicationId })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    currentPaymentOrder = data;
+                    document.getElementById('payment-modal-amount').textContent = '₹' + amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    document.getElementById('payment-gateway-modal').classList.add('active');
+                } else {
+                    showToast('Could not initiate payment order: ' + (data.error || 'Server error'), 'error');
+                }
+            })
+            .catch(err => {
+                showToast('Connection error: ' + err.message, 'error');
+            });
+        };
+
+        document.getElementById('payment-gateway-modal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('payment-gateway-modal')) {
+                document.getElementById('payment-gateway-modal').classList.remove('active');
+            }
+        });
+
+        document.getElementById('payment-modal-submit-btn').addEventListener('click', () => {
+            if (!currentPaymentOrder) return;
+            const btn = document.getElementById('payment-modal-submit-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Processing...';
+
+            // Simulate small network delay
+            setTimeout(() => {
+                // 2. Call Verify API on Backend
+                fetch('/api/payments/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        razorpay_order_id: currentPaymentOrder.order_id,
+                        razorpay_payment_id: 'pay_mock_' + Math.random().toString(36).substring(2, 10),
+                        razorpay_signature: 'sig_mock_' + Math.random().toString(36).substring(2, 10)
+                    })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<span>Pay Now</span>';
+                    document.getElementById('payment-gateway-modal').classList.remove('active');
+                    
+                    if (data.success) {
+                        showToast('Payment verified successfully!', 'success');
+                        if (onPaymentSuccess) {
+                            onPaymentSuccess(data);
+                        }
+                    } else {
+                        showToast('Payment verification failed: ' + (data.message || 'Server error'), 'error');
+                    }
+                })
+                .catch(err => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<span>Pay Now</span>';
+                    showToast('Connection error during verification: ' + err.message, 'error');
+                });
+            }, 1500);
+        });
+    </script>
+</body>
+</html>

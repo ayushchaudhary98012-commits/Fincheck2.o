@@ -1,0 +1,352 @@
+{% extends "base.html" %}
+
+{% block title %}FinTrust | Authentication{% endblock %}
+
+{% block content %}
+<div class="glass-panel form-container">
+    <div style="display: flex; border-bottom: 1px solid var(--glass-border); margin-bottom: 30px;">
+        <button id="tab-login" class="btn" style="flex: 1; border-radius: 0; background: none; border-bottom: 2px solid var(--primary); font-weight: 600; color: var(--primary);">{{ _('Login') }}</button>
+        <button id="tab-register" class="btn" style="flex: 1; border-radius: 0; background: none; border-bottom: 2px solid transparent; font-weight: 500; color: var(--text-secondary);">{{ _('Register_Now') }}</button>
+    </div>
+    
+    <!-- Login Form -->
+    <form id="form-login" style="display: block;" action="/login" method="POST">
+        <input type="hidden" name="action" value="login">
+        <div class="form-header">
+            <h2>{{ _('Welcome_Back') }}</h2>
+            <p>{{ _('Enter_Details') }}</p>
+        </div>
+        
+        <div class="form-group">
+            <label for="login-email">{{ _('Email_Address') }}</label>
+            <input type="email" id="login-email" name="username" class="form-control" placeholder="{{ _('Email_Address') }}" required>
+        </div>
+        
+        <div class="form-group">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <label for="login-password">{{ _('Password') }}</label>
+                <a href="#" id="link-forgot-password" style="font-size: 0.8rem; color: var(--primary); text-decoration: none;">Forgot Password?</a>
+            </div>
+            <input type="password" id="login-password" name="password" class="form-control" placeholder="{{ _('Password') }}" required>
+        </div>
+        
+        <button type="submit" id="btn-login-submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">
+            <i class="fas fa-sign-in-alt"></i> {{ _('Login') }}
+        </button>
+    </form>
+    
+    <!-- Forgot Password Form -->
+    <form id="form-forgot" style="display: none;">
+        <div class="form-header">
+            <h2>Reset Password</h2>
+            <p>Enter your email to receive a password reset link.</p>
+        </div>
+        
+        <div class="form-group">
+            <label for="forgot-email">{{ _('Email_Address') }}</label>
+            <input type="email" id="forgot-email" name="email" class="form-control" placeholder="{{ _('Email_Address') }}" required>
+        </div>
+        
+        <button type="submit" id="btn-forgot-submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">
+            <i class="fas fa-paper-plane"></i> Send Reset Link
+        </button>
+        
+        <div style="text-align: center; margin-top: 15px;">
+            <a href="#" id="link-back-login" style="font-size: 0.9rem; color: var(--primary); text-decoration: none;"><i class="fas fa-arrow-left"></i> Back to Login</a>
+        </div>
+    </form>
+    
+    <!-- Register Form -->
+    <form id="form-register" style="display: none;" action="/login" method="POST">
+        <input type="hidden" name="action" value="register">
+        <div class="form-header">
+            <h2>{{ _('Register_Account') }}</h2>
+            <p>{{ _('Join_FinTrust') }}</p>
+        </div>
+        
+        <div class="form-group">
+            <label for="reg-username">{{ _('Username') }}</label>
+            <input type="text" id="reg-username" name="username" class="form-control" placeholder="{{ _('Username') }}" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="reg-email">{{ _('Email_Address') }}</label>
+            <input type="email" id="reg-email" name="email" class="form-control" placeholder="name@example.com" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="reg-phone">{{ _('Phone_Number') }}</label>
+            <input type="tel" id="reg-phone" name="phone" class="form-control" placeholder="+91..." required>
+        </div>
+        
+        <div class="form-group">
+            <label for="reg-role">{{ _('Select_Role') }}</label>
+            <select id="reg-role" name="role" class="form-control" required>
+                <option value="applicant">{{ _('Borrower') }}</option>
+                <option value="lender">{{ _('Lender') }}</option>
+            </select>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label for="reg-password">{{ _('Password') }}</label>
+                <input type="password" id="reg-password" name="password" class="form-control" placeholder="{{ _('Password') }}" required>
+            </div>
+            <div class="form-group">
+                <label for="reg-confirm">{{ _('Confirm_Password') }}</label>
+                <input type="password" id="reg-confirm" name="confirm_password" class="form-control" placeholder="{{ _('Confirm_Password') }}" required>
+            </div>
+        </div>
+        
+        <button type="submit" id="btn-register-submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">
+            <i class="fas fa-user-plus"></i> {{ _('Register_Now') }}
+        </button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const tabLogin = document.getElementById('tab-login');
+        const tabRegister = document.getElementById('tab-register');
+        const formLogin = document.getElementById('form-login');
+        const formRegister = document.getElementById('form-register');
+        const formForgot = document.getElementById('form-forgot');
+        const linkForgotPassword = document.getElementById('link-forgot-password');
+        const linkBackLogin = document.getElementById('link-back-login');
+        
+        // Initialize Firebase
+        const firebaseConfig = {
+            apiKey: "{{ FIREBASE_API_KEY }}",
+            authDomain: "{{ FIREBASE_AUTH_DOMAIN }}",
+            projectId: "{{ FIREBASE_PROJECT_ID }}",
+            appId: "{{ FIREBASE_APP_ID }}"
+        };
+        
+        const isDemoMode = (firebaseConfig.apiKey === 'AIzaSyA1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6');
+        
+        if (isDemoMode) {
+            console.warn("FinTrust running in Firebase Offline/Demo mode. Token verification will bypass API hits.");
+        } else {
+            try {
+                firebase.initializeApp(firebaseConfig);
+            } catch (e) {
+                console.error("Firebase initialization failed:", e);
+                showToast("Firebase initialization error. Using Offline Demo mode.", "info");
+            }
+        }
+        
+        function showLogin() {
+            formLogin.style.display = 'block';
+            formRegister.style.display = 'none';
+            formForgot.style.display = 'none';
+            tabLogin.style.borderBottomColor = 'var(--primary)';
+            tabLogin.style.color = 'var(--primary)';
+            tabLogin.style.fontWeight = '600';
+            tabRegister.style.borderBottomColor = 'transparent';
+            tabRegister.style.color = 'var(--text-secondary)';
+            tabRegister.style.fontWeight = '500';
+        }
+        
+        function showRegister() {
+            formLogin.style.display = 'none';
+            formRegister.style.display = 'block';
+            formForgot.style.display = 'none';
+            tabRegister.style.borderBottomColor = 'var(--primary)';
+            tabRegister.style.color = 'var(--primary)';
+            tabRegister.style.fontWeight = '600';
+            tabLogin.style.borderBottomColor = 'transparent';
+            tabLogin.style.color = 'var(--text-secondary)';
+            tabLogin.style.fontWeight = '500';
+        }
+        
+        function showForgot() {
+            formLogin.style.display = 'none';
+            formRegister.style.display = 'none';
+            formForgot.style.display = 'block';
+            tabLogin.style.borderBottomColor = 'transparent';
+            tabLogin.style.color = 'var(--text-secondary)';
+            tabLogin.style.fontWeight = '500';
+            tabRegister.style.borderBottomColor = 'transparent';
+            tabRegister.style.color = 'var(--text-secondary)';
+            tabRegister.style.fontWeight = '500';
+        }
+        
+        tabLogin.addEventListener('click', showLogin);
+        tabRegister.addEventListener('click', showRegister);
+        
+        linkForgotPassword.addEventListener('click', (e) => {
+            e.preventDefault();
+            showForgot();
+        });
+        
+        linkBackLogin.addEventListener('click', (e) => {
+            e.preventDefault();
+            showLogin();
+        });
+        
+        // Handle URL query parameters to open register directly
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('register') === 'true') {
+            showRegister();
+        }
+        
+        // Form submissions
+        // Form submissions
+        formRegister.addEventListener('submit', async (e) => {
+            const password = document.getElementById('reg-password').value;
+            const confirm = document.getElementById('reg-confirm').value;
+            
+            if (password !== confirm) {
+                e.preventDefault();
+                showToast('Passwords do not match.', 'error');
+                return;
+            }
+            
+            if (isDemoMode) {
+                // Allow standard native POST form submission to backend
+                return;
+            }
+            
+            e.preventDefault();
+            
+            const username = document.getElementById('reg-username').value.trim();
+            const email = document.getElementById('reg-email').value.trim();
+            const phone = document.getElementById('reg-phone').value.trim();
+            const role = document.getElementById('reg-role').value;
+            const submitBtn = document.getElementById('btn-register-submit');
+            
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating Account...';
+            
+            let firebaseUid = '';
+            
+            try {
+                const userCredential = await firebase.auth().createUserWithEmailAndPassword(email, password);
+                firebaseUid = userCredential.user.uid;
+            } catch (err) {
+                showToast(err.message, 'error');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> Register';
+                return;
+            }
+            
+            // Sync with local sqlite database
+            try {
+                const response = await fetch('/api/register-user', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, phone, role, firebase_uid: firebaseUid })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast('Registration successful! Please login.', 'success');
+                    showLogin();
+                    // Auto-fill login email
+                    document.getElementById('login-email').value = email;
+                    document.getElementById('login-password').value = '';
+                } else {
+                    showToast(data.error || 'Database registration sync failed.', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('Server sync failed. Please check network.', 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> Register';
+            }
+        });
+        
+        formLogin.addEventListener('submit', async (e) => {
+            if (isDemoMode) {
+                // Allow standard native POST form submission to backend
+                return;
+            }
+            
+            e.preventDefault();
+            
+            const email = document.getElementById('login-email').value.trim();
+            const password = document.getElementById('login-password').value;
+            const submitBtn = document.getElementById('btn-login-submit');
+            
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Authenticating...';
+            
+            let idToken = '';
+            
+            try {
+                const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
+                idToken = await userCredential.user.getIdToken();
+            } catch (err) {
+                showToast(err.message, 'error');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
+                return;
+            }
+            
+            // Create local Flask session
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ idToken, email })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast('Logged in successfully!', 'success');
+                    // Redirect to corresponding dashboard
+                    if (data.role === 'admin') {
+                        window.location.href = '/admin/dashboard';
+                    } else if (data.role === 'lender') {
+                        window.location.href = '/lender/dashboard';
+                    } else {
+                        window.location.href = '/applicant/dashboard';
+                    }
+                } else {
+                    showToast(data.error || 'Authentication verification failed.', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('Connection to server failed.', 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
+            }
+        });
+
+        formForgot.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('forgot-email').value.trim();
+            const submitBtn = document.getElementById('btn-forgot-submit');
+            
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending link...';
+            
+            if (isDemoMode) {
+                setTimeout(() => {
+                    showToast(`[Demo Mode] Simulated password reset link sent to: ${email}`, 'success');
+                    console.log(`[Demo Mode] Simulated password reset email sent to: ${email}`);
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Reset Link';
+                    showLogin();
+                }, 1000);
+            } else {
+                try {
+                    await firebase.auth().sendPasswordResetEmail(email);
+                    showToast('Password reset link sent to your email!', 'success');
+                    showLogin();
+                } catch (err) {
+                    showToast(err.message, 'error');
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Reset Link';
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}
