@@ -441,9 +441,6 @@ def trigger_matching_engine(app_id):
 
 @app.route('/')
 def landing():
-    index_file = os.path.join(FRONTEND_DIR, 'index.html')
-    if os.path.exists(index_file):
-        return send_file(index_file)
     return render_template('landing.html')
 
 @app.route('/calculator')
