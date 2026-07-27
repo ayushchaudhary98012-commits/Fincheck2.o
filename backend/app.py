@@ -46,6 +46,8 @@ def send_otp_email(to_email, otp):
     email_user = os.environ.get('EMAIL_USER', '').strip().strip('"\'')
     email_pass = os.environ.get('EMAIL_PASS', '').strip().strip('"\'').replace(" ", "")
     resend_key = os.environ.get('RESEND_API_KEY', '').strip().strip('"\'')
+    brevo_key = os.environ.get('BREVO_API_KEY', os.environ.get('SENDINBLUE_API_KEY', '')).strip().strip('"\'')
+    brevo_sender = os.environ.get('BREVO_SENDER_EMAIL', email_user if email_user else 'no-reply@fintrust.com').strip()
     
     # Always print OTP to the console for easy debugging/testing
     print("\n" + "*" * 60, flush=True)
@@ -55,11 +57,61 @@ def send_otp_email(to_email, otp):
     
     # If using seeded test accounts (e.g. user@fintrust.com), route OTP to the configured target
     target_email = to_email
-    if to_email.lower().endswith('@fintrust.com') and (email_user or resend_key):
+    if to_email.lower().endswith('@fintrust.com') and (email_user or resend_key or brevo_key):
         target_email = email_user if email_user else "onboarding@resend.dev"
         print(f"[INFO] Redirected test account OTP from {to_email} to developer email {target_email}", flush=True)
         
-    # 1. Attempt delivery via Resend API (HTTP Port 443 - never blocked by cloud hosts)
+    # 1. Attempt delivery via Brevo API (HTTP Port 443 - 300 free emails/day to ANY email address)
+    if brevo_key:
+        print(f"[INFO] Attempting to send OTP via Brevo API to {target_email}", flush=True)
+        url = "https://api.brevo.com/v3/smtp/email"
+        headers = {
+            "api-key": brevo_key,
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+        html_body = f"""Hello,<br><br>
+Your FinTrust AI login verification code is: <strong>{otp}</strong><br><br>
+This code is valid for 5 minutes. Please enter this code on the verification screen to complete your login.<br><br>
+If you did not request this code, please secure your account.<br><br>
+Best regards,<br>
+FinTrust Security Team"""
+        
+        payload = {
+            "sender": {
+                "name": "FinTrust Security",
+                "email": brevo_sender
+            },
+            "to": [
+                {
+                    "email": target_email
+                }
+            ],
+            "subject": f"FinTrust Verification Code: {otp}",
+            "htmlContent": html_body
+        }
+        
+        import urllib.request
+        import urllib.error
+        import json
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode('utf-8'),
+            headers=headers,
+            method='POST'
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10) as response:
+                res_data = json.loads(response.read().decode('utf-8'))
+                print(f"[SUCCESS] Brevo API email delivery successful: {res_data}", flush=True)
+                return True
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode('utf-8') if e.fp else str(e)
+            print(f"[WARNING] Brevo API HTTPError {e.code}: {error_body}", flush=True)
+        except Exception as e:
+            print(f"[WARNING] Brevo API delivery failed: {e}", flush=True)
+
+    # 2. Attempt delivery via Resend API (HTTP Port 443)
     if resend_key:
         print(f"[INFO] Attempting to send OTP via Resend API to {target_email}", flush=True)
         url = "https://api.resend.com/emails"
