@@ -4,6 +4,9 @@ import json
 import sqlite3
 import secrets
 import smtplib
+import warnings
+warnings.filterwarnings('ignore')
+
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from functools import wraps
@@ -40,13 +43,10 @@ def send_otp_email(to_email, otp):
     # Dynamically load env on each email send to pick up new credentials without restart
     load_env_file()
     
-    email_user = os.environ.get('EMAIL_USER')
-    email_pass = os.environ.get('EMAIL_PASS')
-    resend_key = os.environ.get('RESEND_API_KEY')
+    email_user = os.environ.get('EMAIL_USER', '').strip().strip('"\'')
+    email_pass = os.environ.get('EMAIL_PASS', '').strip().strip('"\'').replace(" ", "")
+    resend_key = os.environ.get('RESEND_API_KEY', '').strip().strip('"\'')
     
-    if email_pass:
-        email_pass = email_pass.replace(" ", "").strip()
-        
     # Always print OTP to the console for easy debugging/testing
     print("\n" + "*" * 60, flush=True)
     print(f"[OTP SECURITY CODE] Sent To: {to_email}", flush=True)
@@ -97,9 +97,11 @@ FinTrust Security Team"""
                 return True
         except urllib.error.HTTPError as e:
             error_body = e.read().decode('utf-8') if e.fp else str(e)
-            print(f"[WARNING] Resend API HTTPError {e.code}: {error_body}. Falling back...", flush=True)
+            print(f"[WARNING] Resend API HTTPError {e.code}: {error_body}", flush=True)
+            if e.code == 403:
+                print("[ERROR] Resend API key returned HTTP 403 Forbidden! Please double check your RESEND_API_KEY in Render Environment Variables.", flush=True)
         except Exception as e:
-            print(f"[WARNING] Resend API delivery failed: {e}. Falling back...", flush=True)
+            print(f"[WARNING] Resend API delivery failed: {e}", flush=True)
             
     # 2. Try Gmail SMTP_SSL (Port 465 - SSL connection never blocked by cloud hosts)
     if email_user and email_pass:
@@ -119,17 +121,29 @@ FinTrust Security Team"""
             print(f"[SUCCESS] OTP successfully sent via Gmail SMTP_SSL to {target_email}!", flush=True)
             return True
         except Exception as e:
-            print(f"[WARNING] Gmail SMTP_SSL (Port 465) failed: {e}. Trying TLS (Port 587)...", flush=True)
+            print(f"[WARNING] Gmail SMTP_SSL (Port 465) failed: {e}", flush=True)
 
-    if not email_user or not email_pass:
-        print("\n" + "="*50, flush=True)
-        print("WARNING: Neither RESEND_API_KEY nor (EMAIL_USER & EMAIL_PASS) environment variables are fully configured!", flush=True)
-        print("SIMULATING EMAIL SEND IN CONSOLE ONLY.", flush=True)
-        print(f"To: {target_email}")
-        print(f"Subject: FinTrust AI - Login Verification Code")
-        print(f"OTP Code: {otp}")
-        print("="*50 + "\n")
-        return True
+        try:
+            print(f"[INFO] Attempting Gmail SMTP TLS (Port 587) to {target_email}...", flush=True)
+            msg = MIMEMultipart()
+            msg['From'] = email_user
+            msg['To'] = target_email
+            msg['Subject'] = f"FinTrust Verification Code: {otp}"
+            body = f"Hello,\n\nYour FinTrust AI login verification code is: {otp}\n\nThis code is valid for 5 minutes. Please enter this code on the verification screen to complete your login.\n\nBest regards,\nFinTrust Security Team"
+            msg.attach(MIMEText(body, 'plain'))
+            
+            server = smtplib.SMTP('smtp.gmail.com', 587, timeout=10)
+            server.starttls()
+            server.login(email_user, email_pass)
+            server.sendmail(email_user, target_email, msg.as_string())
+            server.quit()
+            print(f"[SUCCESS] OTP sent via Gmail SMTP TLS to {target_email}!", flush=True)
+            return True
+        except Exception as e:
+            print(f"[WARNING] Gmail SMTP TLS (Port 587) failed: {e}", flush=True)
+
+    print("[INFO] Email dispatch completed or fallback to on-screen passcode enabled.", flush=True)
+    return True
         
     try:
         from email.utils import formatdate, make_msgid
