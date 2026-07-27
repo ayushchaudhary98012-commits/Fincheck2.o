@@ -97,7 +97,26 @@ FinTrust Security Team"""
         except Exception as e:
             print(f"[WARNING] Resend API delivery failed: {e}. Falling back to SMTP...", flush=True)
             
-    # 2. Fallback to standard SMTP (Port 587 - might be blocked on some cloud environments)
+    # 2. Try Gmail SMTP_SSL (Port 465 - SSL connection never blocked by cloud hosts)
+    if email_user and email_pass:
+        try:
+            print(f"[INFO] Attempting Gmail SMTP_SSL (Port 465) to {target_email}...", flush=True)
+            msg = MIMEMultipart()
+            msg['From'] = email_user
+            msg['To'] = target_email
+            msg['Subject'] = f"FinTrust Verification Code: {otp}"
+            body = f"Hello,\n\nYour FinTrust AI login verification code is: {otp}\n\nThis code is valid for 5 minutes. Please enter this code on the verification screen to complete your login.\n\nBest regards,\nFinTrust Security Team"
+            msg.attach(MIMEText(body, 'plain'))
+            
+            server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=10)
+            server.login(email_user, email_pass)
+            server.sendmail(email_user, target_email, msg.as_string())
+            server.quit()
+            print(f"[SUCCESS] OTP successfully sent via Gmail SMTP_SSL to {target_email}!", flush=True)
+            return True
+        except Exception as e:
+            print(f"[WARNING] Gmail SMTP_SSL (Port 465) failed: {e}. Trying TLS (Port 587)...", flush=True)
+
     if not email_user or not email_pass:
         print("\n" + "="*50, flush=True)
         print("WARNING: Neither RESEND_API_KEY nor (EMAIL_USER & EMAIL_PASS) environment variables are fully configured!", flush=True)
