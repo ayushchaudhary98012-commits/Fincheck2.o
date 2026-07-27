@@ -282,31 +282,25 @@ def init_db():
         )
     ''')
 
-    # Check if a seed admin user exists, if not create one
-    cursor.execute("SELECT * FROM users WHERE role = 'admin'")
-    if not cursor.fetchone():
-        admin_pass = generate_password_hash('admin123')
-        cursor.execute(
-            "INSERT INTO users (username, password_hash, email, role) VALUES (?, ?, ?, ?)",
-            ('admin', admin_pass, 'admin@fintrust.com', 'admin')
-        )
-        # Also create a default applicant for easy testing
-        applicant_pass = generate_password_hash('user123')
-        cursor.execute(
-            "INSERT INTO users (username, password_hash, email, role) VALUES (?, ?, ?, ?)",
-            ('user', applicant_pass, 'user@fintrust.com', 'applicant')
-        )
-        # Create a default lender
-        lender_pass = generate_password_hash('lender123')
-        cursor.execute(
-            "INSERT INTO users (username, password_hash, email, role) VALUES (?, ?, ?, ?)",
-            ('lender', lender_pass, 'lender@fintrust.com', 'lender')
-        )
-        lender_id = cursor.lastrowid
-        cursor.execute(
-            "INSERT INTO lender_preferences (user_id, max_lending_amount, min_trust_score, interest_rate, preferred_location, preferred_duration) VALUES (?, ?, ?, ?, ?, ?)",
-            (lender_id, 2000000.0, 60, 10.5, 'All', 24)
-        )
+    # Check and insert seed users safely without UNIQUE constraint errors
+    seed_users = [
+        ('admin', generate_password_hash('admin123'), 'admin@fintrust.com', 'admin'),
+        ('user', generate_password_hash('user123'), 'user@fintrust.com', 'applicant'),
+        ('lender', generate_password_hash('lender123'), 'lender@fintrust.com', 'lender')
+    ]
+    for username, password_hash, email, role in seed_users:
+        cursor.execute("SELECT id FROM users WHERE username = ? OR email = ?", (username, email))
+        if not cursor.fetchone():
+            cursor.execute(
+                "INSERT INTO users (username, password_hash, email, role) VALUES (?, ?, ?, ?)",
+                (username, password_hash, email, role)
+            )
+            if role == 'lender':
+                lender_id = cursor.lastrowid
+                cursor.execute(
+                    "INSERT OR IGNORE INTO lender_preferences (user_id, max_lending_amount, min_trust_score, interest_rate, preferred_location, preferred_duration) VALUES (?, ?, ?, ?, ?, ?)",
+                    (lender_id, 2000000.0, 60, 10.5, 'All', 24)
+                )
     
     conn.commit()
     conn.close()
