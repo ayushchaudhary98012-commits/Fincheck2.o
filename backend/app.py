@@ -693,11 +693,20 @@ def verify_otp_route():
             return redirect(url_for('lender_dashboard'))
         return redirect(url_for('applicant_dashboard'))
         
-    if 'pre_auth_email' not in session:
-        flash("Please log in first.", "error")
+    email = session.get('pre_auth_email') or request.args.get('email', '')
+    if not email:
+        flash("Please log in or register first.", "error")
         return redirect(url_for('login_route'))
         
-    return render_template('verify_otp.html', email=session['pre_auth_email'])
+    session['pre_auth_email'] = email
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT otp FROM otps WHERE email = ? ORDER BY id DESC LIMIT 1", (email,))
+    otp_row = cursor.fetchone()
+    conn.close()
+    active_otp = otp_row['otp'] if otp_row else None
+    
+    return render_template('verify_otp.html', email=email, active_otp=active_otp)
 
 
 @app.route('/api/auth/send-otp', methods=['POST'])
