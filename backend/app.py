@@ -75,13 +75,14 @@ Best regards,<br>
 FinTrust Security Team"""
         
         payload = {
-            "from": "FinTrust <onboarding@resend.dev>",
+            "from": "onboarding@resend.dev",
             "to": [target_email],
             "subject": f"FinTrust Verification Code: {otp}",
             "html": html_body
         }
         
         import urllib.request
+        import urllib.error
         import json
         req = urllib.request.Request(
             url,
@@ -94,8 +95,11 @@ FinTrust Security Team"""
                 res_data = json.loads(response.read().decode('utf-8'))
                 print(f"[INFO] Resend email delivery successful: {res_data}", flush=True)
                 return True
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode('utf-8') if e.fp else str(e)
+            print(f"[WARNING] Resend API HTTPError {e.code}: {error_body}. Falling back...", flush=True)
         except Exception as e:
-            print(f"[WARNING] Resend API delivery failed: {e}. Falling back to SMTP...", flush=True)
+            print(f"[WARNING] Resend API delivery failed: {e}. Falling back...", flush=True)
             
     # 2. Try Gmail SMTP_SSL (Port 465 - SSL connection never blocked by cloud hosts)
     if email_user and email_pass:
